@@ -3,6 +3,7 @@ import { AirlineLayout } from "@/components/airline-layout";
 import { BackupStatus } from "@/components/backup/backup-status";
 import { BackupSettingsComponent } from "@/components/backup/backup-settings";
 import { BackupHistoryComponent } from "@/components/backup/backup-history";
+import { BackupImport } from "@/components/backup/backup-import";
 
 export default function Backup() {
   return (
@@ -41,7 +42,10 @@ export default function Backup() {
         </div>
       </div>
       
-      <BackupHistoryComponent />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <BackupHistoryComponent />
+        <BackupImport />
+      </div>
     </AirlineLayout>
   );
 }

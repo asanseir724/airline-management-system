@@ -5,6 +5,9 @@ import { setupAuth } from "./auth";
 import { SmsService } from "./services/sms";
 import { TelegramService } from "./services/telegram";
 import { ReportService } from "./services/report";
+import fileUpload, { UploadedFile } from "express-fileupload";
+
+// حذف تعریف interface چون با تایپ های express-fileupload تداخل دارد
 import { 
   insertRequestSchema, 
   insertSmsTemplateSchema, 
@@ -26,6 +29,13 @@ const isAuthenticated = (req: Request, res: Response, next: NextFunction) => {
 
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
+  
+  // تنظیم middleware برای آپلود فایل
+  app.use(fileUpload({
+    limits: { fileSize: 10 * 1024 * 1024 }, // محدودیت 10 مگابایت
+    useTempFiles: true,
+    tempFileDir: './temp/'
+  }));
   
   // API routes
   // Requests routes
@@ -932,6 +942,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // مسیرهای مدیریت لاگ‌های سیستم
+  // API برای ایمپورت بک‌آپ
+  app.post("/api/import-backup", isAuthenticated, async (req, res, next) => {
+    try {
+      // بررسی اینکه آیا فایل بک‌آپ در درخواست وجود دارد
+      if (!req.files || !req.files.backupFile) {
+        return res.status(400).json({
+          success: false,
+          message: "لطفا فایل بک‌آپ را انتخاب کنید"
+        });
+      }
+      
+      // اگر چندین فایل آپلود شده باشد، فقط اولی را در نظر می‌گیریم
+      const backupFile = Array.isArray(req.files.backupFile) 
+        ? req.files.backupFile[0] 
+        : req.files.backupFile;
+      
+      // بررسی نوع فایل
+      if (backupFile.mimetype !== 'application/json') {
+        return res.status(400).json({
+          success: false,
+          message: "فرمت فایل نامعتبر است. لطفا فایل JSON انتخاب کنید"
+        });
+      }
+      
+      // استفاده از سرویس بک‌آپ برای وارد کردن بک‌آپ
+      const { BackupService } = await import('./services/backup');
+      const importResult = await BackupService.importBackup(backupFile.data);
+      
+      res.json(importResult);
+    } catch (error) {
+      console.error('خطا در وارد کردن بک‌آپ:', error);
+      
+      // ثبت لاگ خطا
+      await storage.createSystemLog({
+        level: 'error',
+        message: `خطا در وارد کردن بک‌آپ: ${error instanceof Error ? error.message : 'خطای ناشناخته'}`
+      });
+      
+      res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'خطای ناشناخته در وارد کردن بک‌آپ'
+      });
+    }
+  });
+  
   app.get("/api/system-logs", isAuthenticated, async (req, res, next) => {
     try {
       const logs = await storage.getSystemLogs();

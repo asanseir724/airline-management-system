@@ -5,7 +5,7 @@ import path from 'path';
 import { CustomerRequest, Request, SmsHistory, TelegramHistory } from '@shared/schema';
 
 /**
- * سرویس بک‌آپ‌گیری سیستم
+ * سرویس بک‌آپ‌گیری و بازیابی سیستم
  */
 export class BackupService {
   /**
@@ -38,7 +38,7 @@ export class BackupService {
       // تهیه فایل بک‌آپ
       const timestamp = new Date().toISOString().replace(/[:.]/g, '');
       const filename = `backup_${timestamp}.json`;
-      const tempDir = path.join(__dirname, '../../temp');
+      const tempDir = path.join(process.cwd(), 'temp');
       const filePath = path.join(tempDir, filename);
       
       // ایجاد دایرکتوری موقت اگر وجود ندارد
@@ -222,6 +222,120 @@ export class BackupService {
       return {
         success: false,
         message: error instanceof Error ? error.message : 'خطای ناشناخته در ارسال فایل به تلگرام'
+      };
+    }
+  }
+  
+  /**
+   * وارد کردن (ایمپورت) بک‌آپ به سیستم
+   * @param backupFile فایل بک‌آپ
+   * @returns نتیجه وارد کردن بک‌آپ
+   */
+  static async importBackup(backupFile: Buffer): Promise<{
+    success: boolean;
+    message: string;
+    stats?: {
+      customerRequests: number;
+      requests: number;
+      smsHistory: number;
+      telegramHistory: number;
+    };
+  }> {
+    try {
+      // پارس کردن فایل بک‌آپ
+      const backupData = JSON.parse(backupFile.toString('utf8'));
+      
+      // بررسی ساختار فایل بک‌آپ
+      if (!backupData.timestamp || 
+          !Array.isArray(backupData.customerRequests) || 
+          !Array.isArray(backupData.requests) || 
+          !Array.isArray(backupData.smsHistory) || 
+          !Array.isArray(backupData.telegramHistory)) {
+        return {
+          success: false,
+          message: 'ساختار فایل بک‌آپ نامعتبر است'
+        };
+      }
+      
+      // آماده‌سازی داده‌ها برای وارد کردن
+      const customerRequests = backupData.customerRequests;
+      const requests = backupData.requests;
+      const smsHistory = backupData.smsHistory;
+      const telegramHistory = backupData.telegramHistory;
+      
+      // ایجاد آمار اولیه
+      const stats = {
+        customerRequests: customerRequests.length,
+        requests: requests.length,
+        smsHistory: smsHistory.length,
+        telegramHistory: telegramHistory.length
+      };
+      
+      // وارد کردن داده‌ها (در یک عملیات همزمان)
+      // توجه: برای سادگی، ما فقط داده‌های جدید را اضافه می‌کنیم و داده‌های موجود را حذف نمی‌کنیم
+      
+      // درخواست‌های مشتری
+      for (const request of customerRequests) {
+        // بررسی اینکه آیا درخواست با trackingCode قبلاً ثبت شده است
+        const existingRequest = await storage.getCustomerRequestByVoucherNumber(request.voucherNumber);
+        if (!existingRequest) {
+          // فیلدهای ضروری را استخراج می‌کنیم
+          const { id, createdAt, updatedAt, ...insertData } = request;
+          // اضافه کردن درخواست جدید
+          await storage.createCustomerRequest({
+            ...insertData,
+            trackingCode: insertData.trackingCode || `TR${Math.floor(Math.random() * 1000000)}`
+          });
+        }
+      }
+      
+      // درخواست‌های داخلی
+      for (const request of requests) {
+        // فیلدهای ضروری را استخراج می‌کنیم
+        const { id, createdAt, updatedAt, ...insertData } = request;
+        // اضافه کردن درخواست جدید
+        await storage.createRequest(insertData);
+      }
+      
+      // تاریخچه پیامک
+      for (const history of smsHistory) {
+        // فیلدهای ضروری را استخراج می‌کنیم
+        const { id, createdAt, updatedAt, ...insertData } = history;
+        // اضافه کردن تاریخچه جدید
+        await storage.createSmsHistory(insertData);
+      }
+      
+      // تاریخچه تلگرام
+      for (const history of telegramHistory) {
+        // فیلدهای ضروری را استخراج می‌کنیم
+        const { id, createdAt, updatedAt, ...insertData } = history;
+        // اضافه کردن تاریخچه جدید
+        await storage.createTelegramHistory(insertData);
+      }
+      
+      // ثبت لاگ سیستم
+      await storage.createSystemLog({
+        level: 'info',
+        message: `بک‌آپ با موفقیت وارد شد. تعداد رکوردها: درخواست‌های مشتری (${stats.customerRequests})، درخواست‌های داخلی (${stats.requests})، تاریخچه پیامک (${stats.smsHistory})، تاریخچه تلگرام (${stats.telegramHistory})`
+      });
+      
+      return {
+        success: true,
+        message: 'بک‌آپ با موفقیت وارد سیستم شد',
+        stats
+      };
+    } catch (error) {
+      console.error('خطا در وارد کردن بک‌آپ:', error);
+      
+      // ثبت لاگ خطا
+      await storage.createSystemLog({
+        level: 'error',
+        message: `خطا در وارد کردن بک‌آپ: ${error instanceof Error ? error.message : 'خطای ناشناخته'}`
+      });
+      
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'خطای ناشناخته در وارد کردن بک‌آپ'
       };
     }
   }
