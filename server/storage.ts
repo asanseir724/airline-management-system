@@ -139,6 +139,7 @@ export interface IStorage {
   
   // Tour Data methods
   getTourData(): Promise<TourData[]>;
+  getTourDataById(id: number): Promise<TourData | undefined>;
   getTourDataBySourceId(sourceId: number): Promise<TourData[]>;
   createTourData(data: InsertTourData): Promise<TourData>;
   updateTourData(id: number, data: Partial<InsertTourData>): Promise<TourData | undefined>;
@@ -804,6 +805,12 @@ export class DatabaseStorage implements IStorage {
   // Tour Data methods
   async getTourData(): Promise<TourData[]> {
     return await this.db.select().from(schema.tourData).orderBy(desc(schema.tourData.createdAt));
+  }
+  
+  async getTourDataById(id: number): Promise<TourData | undefined> {
+    const result = await this.db.select().from(schema.tourData)
+      .where(eq(schema.tourData.id, id));
+    return result[0];
   }
   
   async getTourDataBySourceId(sourceId: number): Promise<TourData[]> {

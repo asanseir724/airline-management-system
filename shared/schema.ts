@@ -409,6 +409,10 @@ export const tourData = pgTable("tour_data", {
   brandId: integer("brand_id").references(() => tourBrands.id),
   isPublished: boolean("is_published").default(false).notNull(),
   metadata: jsonb("metadata"),
+  services: jsonb("services"),
+  hotels: jsonb("hotels"),
+  requiredDocuments: jsonb("required_documents"),
+  cancellationPolicy: text("cancellation_policy"),
   scrapedAt: timestamp("scraped_at").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -426,6 +430,10 @@ export const insertTourDataSchema = createInsertSchema(tourData).pick({
   brandId: true,
   isPublished: true,
   metadata: true,
+  services: true,
+  hotels: true,
+  requiredDocuments: true,
+  cancellationPolicy: true,
 });
 
 export type TourData = typeof tourData.$inferSelect;

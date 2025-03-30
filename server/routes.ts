@@ -5,6 +5,7 @@ import { setupAuth } from "./auth";
 import { SmsService } from "./services/sms";
 import { TelegramService } from "./services/telegram";
 import { ReportService } from "./services/report";
+import { generateTelegramMessage } from "./services/telegram-message";
 import fileUpload, { UploadedFile } from "express-fileupload";
 
 // حذف تعریف interface چون با تایپ های express-fileupload تداخل دارد
@@ -18,6 +19,7 @@ import {
   insertSystemLogSchema,
   insertSmsSettingsSchema,
   insertTourDestinationSchema,
+  insertTourSourceSchema,
   insertTourBrandSchema,
   insertTourBrandRequestSchema,
   insertTourSettingsSchema,
@@ -1550,6 +1552,171 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         res.status(500).json({ message: "خطا در پاک کردن لاگ‌های تور" });
       }
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // API for tour data (اطلاعات تورها)
+  app.get("/api/tour-sources", isAuthenticated, async (req, res, next) => {
+    try {
+      const sources = await storage.getTourSources();
+      res.json(sources);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/tour-sources/:id", isAuthenticated, async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id);
+      const source = await storage.getTourSourceById(id);
+      if (!source) {
+        return res.status(404).json({ message: "منبع تور یافت نشد" });
+      }
+      res.json(source);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/tour-sources", isAuthenticated, async (req, res, next) => {
+    try {
+      const validation = insertTourSourceSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "اطلاعات منبع تور معتبر نیست", 
+          errors: validation.error.errors 
+        });
+      }
+      
+      const source = await storage.createTourSource(validation.data);
+      
+      // ثبت لاگ سیستم
+      await storage.createTourLog({
+        level: "INFO",
+        message: `منبع تور جدید "${source.name}" اضافه شد`,
+        content: source.url
+      });
+      
+      res.status(201).json(source);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.patch("/api/tour-sources/:id", isAuthenticated, async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id);
+      const validation = insertTourSourceSchema.partial().safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "اطلاعات منبع تور معتبر نیست", 
+          errors: validation.error.errors 
+        });
+      }
+      
+      const source = await storage.updateTourSource(id, validation.data);
+      if (!source) {
+        return res.status(404).json({ message: "منبع تور یافت نشد" });
+      }
+      
+      // ثبت لاگ سیستم
+      await storage.createTourLog({
+        level: "INFO",
+        message: `منبع تور "${source.name}" بروزرسانی شد`,
+        content: JSON.stringify(validation.data)
+      });
+      
+      res.json(source);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/tour-sources/:id", isAuthenticated, async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id);
+      // ابتدا اطلاعات منبع را قبل از حذف دریافت می‌کنیم
+      const source = await storage.getTourSourceById(id);
+      if (!source) {
+        return res.status(404).json({ message: "منبع تور یافت نشد" });
+      }
+      
+      // حذف داده‌های مرتبط با این منبع
+      await storage.deleteTourDataBySourceId(id);
+      
+      // حذف منبع
+      const success = await storage.deleteTourSource(id);
+      if (!success) {
+        return res.status(500).json({ message: "حذف منبع تور با خطا مواجه شد" });
+      }
+      
+      // ثبت لاگ سیستم
+      await storage.createTourLog({
+        level: "INFO",
+        message: `منبع تور "${source.name}" حذف شد`,
+        content: source.url
+      });
+      
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/tour-data", isAuthenticated, async (req, res, next) => {
+    try {
+      const { sourceId } = req.query;
+      let tourData;
+      
+      if (sourceId && typeof sourceId === 'string') {
+        tourData = await storage.getTourDataBySourceId(parseInt(sourceId));
+      } else {
+        tourData = await storage.getTourData();
+      }
+      
+      res.json(tourData);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/tour-data/generate-message", isAuthenticated, async (req, res, next) => {
+    try {
+      const messageSchema = z.object({
+        tourId: z.number(),
+      });
+      
+      const validation = messageSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "اطلاعات درخواست معتبر نیست", 
+          errors: validation.error.errors 
+        });
+      }
+      
+      const { tourId } = validation.data;
+      const tourData = await storage.getTourDataById(tourId);
+      
+      if (!tourData) {
+        return res.status(404).json({ message: "اطلاعات تور یافت نشد" });
+      }
+      
+      // گرفتن اطلاعات metadata برای استخراج خدمات، هتل‌ها و غیره
+      const metadata = tourData.metadata as any;
+      const extendedTourData = {
+        ...tourData,
+        services: metadata?.services || [],
+        hotels: metadata?.hotels || [],
+        requiredDocuments: metadata?.requiredDocuments || [],
+        cancellationPolicy: metadata?.cancellationPolicy || "",
+      };
+      
+      // تولید پیام تلگرام با استفاده از تابع
+      const telegramMessage = generateTelegramMessage(extendedTourData);
+      
+      res.json({ message: telegramMessage });
     } catch (error) {
       next(error);
     }
