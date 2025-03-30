@@ -1800,10 +1800,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // تولید پیام تلگرام با استفاده از تابع
       const telegramMessage = generateTelegramMessage(extendedTourData as any);
       
-      // ارسال پیام به تلگرام
+      // ارسال پیام به تلگرام - ارسال undefined به جای tourData.id برای جلوگیری از خطای کلید خارجی
       const result = await TelegramService.sendMessage(
         telegramMessage,
-        tourData.id,
+        undefined,
         tourData.title,
         'tour'
       );

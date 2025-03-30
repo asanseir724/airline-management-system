@@ -95,7 +95,7 @@ export const insertTelegramConfigSchema = createInsertSchema(telegramConfig).pic
 // Telegram message history
 export const telegramHistory = pgTable("telegram_history", {
   id: serial("id").primaryKey(),
-  requestId: integer("request_id").references(() => requests.id),
+  requestId: integer("request_id").references(() => requests.id, { onDelete: 'set null' }),
   customerName: text("customer_name").notNull(),
   requestType: text("request_type").notNull(),
   status: text("status").notNull(), // 'sent', 'failed'

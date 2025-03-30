@@ -47,7 +47,7 @@ export interface ExtendedTourData {
 
 export function generateTelegramMessage(tour: ExtendedTourData): string {
   // عنوان تور
-  let message = `🌟 تور گردشگری ${tour.title} 🌟\n\n`;
+  let message = `*🌟 تور گردشگری ${tour.title} 🌟*\n\n`;
   
   // توضیحات کوتاه
   if (tour.description) {
@@ -55,7 +55,7 @@ export function generateTelegramMessage(tour: ExtendedTourData): string {
   }
   
   // خدمات تور
-  message += `✨ خدمات تور:\n\n`;
+  message += `*✨ خدمات تور:*\n\n`;
   if (tour.services && Array.isArray(tour.services) && tour.services.length > 0) {
     tour.services.forEach((service: any) => {
       message += `✅ ${service}\n`;
@@ -66,7 +66,7 @@ export function generateTelegramMessage(tour: ExtendedTourData): string {
   }
   
   // اطلاعات هتل‌ها
-  message += `🏨 لیست هتل‌ها بر اساس ستاره:\n\n`;
+  message += `*🏨 لیست هتل‌ها بر اساس ستاره:*\n\n`;
   if (tour.hotels && Array.isArray(tour.hotels) && tour.hotels.length > 0) {
     // مرتب سازی هتل‌ها بر اساس تعداد ستاره (از کم به زیاد)
     const sortedHotels = [...tour.hotels].sort((a: any, b: any) => a.stars - b.stars);
@@ -83,7 +83,7 @@ export function generateTelegramMessage(tour: ExtendedTourData): string {
   
   // مدارک مورد نیاز
   if (tour.requiredDocuments && Array.isArray(tour.requiredDocuments) && tour.requiredDocuments.length > 0) {
-    message += `📄 مدارک مورد نیاز:\n\n`;
+    message += `*📄 مدارک مورد نیاز:*\n\n`;
     tour.requiredDocuments.forEach((doc: any) => {
       message += `• ${doc}\n`;
     });
@@ -92,21 +92,21 @@ export function generateTelegramMessage(tour: ExtendedTourData): string {
   
   // قوانین کنسلی
   if (tour.cancellationPolicy) {
-    message += `⚠️ قوانین کنسلی:\n${tour.cancellationPolicy}\n\n`;
+    message += `*⚠️ قوانین کنسلی:*\n${tour.cancellationPolicy}\n\n`;
   }
   
   // اطلاعات تماس و پایان پیام
-  message += `📢 جهت رزرو تور با ما تماس بگیرید!\n\n`;
-  message += `📞 شماره تماس: 02191300545\n\n`;
+  message += `*📢 جهت رزرو تور با ما تماس بگیرید!*\n\n`;
+  message += `*📞 شماره تماس:* 02191300545\n\n`;
   
   // لینک تور اگر موجود باشد
   if (tour.originalUrl) {
-    message += `🔗 لینک تور: ${tour.originalUrl}\n\n`;
+    message += `*🔗 لینک تور:* ${tour.originalUrl}\n\n`;
   } else if (tour.link) {
-    message += `🔗 لینک تور: ${tour.link}\n\n`;
+    message += `*🔗 لینک تور:* ${tour.link}\n\n`;
   }
   
-  message += `⏳ فرصت محدود! همین حالا اقدام کنید! 🌍`;
+  message += `*⏳ فرصت محدود! همین حالا اقدام کنید! 🌍*`;
   
   return message;
 }
