@@ -2,6 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
+import { SmsService } from "./services/sms";
 import { 
   insertRequestSchema, 
   insertSmsTemplateSchema, 
@@ -93,8 +94,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // SMS Templates routes
-  app.get("/api/sms-templates", isAuthenticated, async (req, res, next) => {
+  // مسیرهای الگوی پیامک حذف شده‌اند زیرا در مسیرهای جدید پیاده‌سازی شده‌اند
+  
+  // مسیرهای API پیامک
+  app.get("/api/sms/templates", isAuthenticated, async (req, res, next) => {
     try {
       const templates = await storage.getSmsTemplates();
       res.json(templates);
@@ -103,11 +106,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.post("/api/sms-templates", isAuthenticated, async (req, res, next) => {
+  app.post("/api/sms/templates", isAuthenticated, async (req, res, next) => {
     try {
       const validation = insertSmsTemplateSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ message: "Invalid template data", errors: validation.error.errors });
+        return res.status(400).json({ 
+          message: "اطلاعات الگوی پیامک معتبر نیست", 
+          errors: validation.error.errors 
+        });
       }
       
       const template = await storage.createSmsTemplate(validation.data);
@@ -117,12 +123,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.patch("/api/sms-templates/:id", isAuthenticated, async (req, res, next) => {
+  app.patch("/api/sms/templates/:id", isAuthenticated, async (req, res, next) => {
     try {
       const id = parseInt(req.params.id);
       const template = await storage.updateSmsTemplate(id, req.body);
       if (!template) {
-        return res.status(404).json({ message: "Template not found" });
+        return res.status(404).json({ message: "الگوی پیامک یافت نشد" });
       }
       res.json(template);
     } catch (error) {
@@ -130,12 +136,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.delete("/api/sms-templates/:id", isAuthenticated, async (req, res, next) => {
+  app.delete("/api/sms/templates/:id", isAuthenticated, async (req, res, next) => {
     try {
       const id = parseInt(req.params.id);
       const success = await storage.deleteSmsTemplate(id);
       if (!success) {
-        return res.status(404).json({ message: "Template not found" });
+        return res.status(404).json({ message: "الگوی پیامک یافت نشد" });
       }
       res.status(204).send();
     } catch (error) {
@@ -143,8 +149,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // SMS History routes
-  app.get("/api/sms-history", isAuthenticated, async (req, res, next) => {
+  app.get("/api/sms/history", isAuthenticated, async (req, res, next) => {
     try {
       const history = await storage.getSmsHistory();
       res.json(history);
@@ -153,18 +158,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.post("/api/send-sms", isAuthenticated, async (req, res, next) => {
+  app.post("/api/sms/send", isAuthenticated, async (req, res, next) => {
     try {
-      const validation = insertSmsHistorySchema.safeParse(req.body);
+      const smsSchema = z.object({
+        phoneNumber: z.string().min(10),
+        content: z.string().min(1).max(160),
+        requestId: z.number().nullable().optional(),
+      });
+      
+      const validation = smsSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ message: "Invalid SMS data", errors: validation.error.errors });
+        return res.status(400).json({ 
+          message: "اطلاعات پیامک معتبر نیست", 
+          errors: validation.error.errors 
+        });
       }
       
-      // In a real app, we would call SMS API here
-      // For now, just record the attempt
-      const smsRecord = await storage.createSmsHistory(validation.data);
-      res.status(201).json(smsRecord);
+      // ارسال پیامک از طریق سرویس AmootSMS
+      const { phoneNumber, content, requestId } = validation.data;
+      const result = await SmsService.sendSms(phoneNumber, content, requestId || undefined);
+      
+      if (result.status) {
+        res.status(200).json({
+          success: true,
+          message: result.message,
+          messageId: result.messageId
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          message: result.message
+        });
+      }
     } catch (error) {
+      console.error('Error in sending SMS:', error);
       next(error);
     }
   });
@@ -291,15 +318,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Send confirmation SMS if configured
+      // ارسال پیامک تاییدیه
       const smsTemplates = await storage.getSmsTemplates();
       const pendingTemplate = smsTemplates.find(t => t.name === "در حال بررسی");
       if (pendingTemplate) {
-        await storage.createSmsHistory({
-          phoneNumber: request.phoneNumber,
-          content: pendingTemplate.content,
-          status: "sent"
-        });
+        try {
+          // ارسال پیامک از طریق سرویس AmootSMS
+          await SmsService.sendSms(request.phoneNumber, pendingTemplate.content, request.id);
+        } catch (smsError) {
+          console.error('Error sending confirmation SMS:', smsError);
+          // در صورت خطا، فقط لاگ می‌کنیم و اجازه می‌دهیم درخواست ادامه یابد
+        }
       }
       
       res.status(201).json(request);
@@ -357,11 +386,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         if (template) {
-          await storage.createSmsHistory({
-            phoneNumber: request.phoneNumber,
-            content: template.content,
-            status: "sent"
-          });
+          try {
+            // ارسال پیامک از طریق سرویس AmootSMS
+            await SmsService.sendSms(request.phoneNumber, template.content, request.id);
+          } catch (smsError) {
+            console.error('Error sending status update SMS:', smsError);
+            // در صورت خطا، فقط لاگ می‌کنیم و اجازه می‌دهیم درخواست ادامه یابد
+          }
         }
       }
       

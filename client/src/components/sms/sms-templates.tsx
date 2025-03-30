@@ -1,358 +1,322 @@
-import React, { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import { SmsTemplate, insertSmsTemplateSchema } from "@shared/schema";
-import { PlusCircle, Edit, Trash } from "lucide-react";
+import React, { useState } from 'react';
+import { z } from 'zod';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { apiRequest, queryClient } from '@/lib/queryClient';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { SmsTemplate } from '@shared/schema';
+import { Loader2, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
-const templateFormSchema = insertSmsTemplateSchema.extend({
-  name: z.string().min(3, "نام الگو باید حداقل ۳ کاراکتر باشد"),
-  content: z.string().min(5, "متن الگو باید حداقل ۵ کاراکتر باشد"),
+// اسکیما برای فرم الگوی پیامک
+const templateFormSchema = z.object({
+  name: z.string().min(1, { message: 'نام الگو نمی‌تواند خالی باشد' }),
+  content: z.string().min(1, { message: 'متن الگو نمی‌تواند خالی باشد' }).max(160, { message: 'متن الگو نمی‌تواند بیش از 160 کاراکتر باشد' }),
 });
 
-type TemplateFormValues = z.infer<typeof templateFormSchema>;
+type TemplateFormData = z.infer<typeof templateFormSchema>;
 
 export function SmsTemplates() {
   const { toast } = useToast();
-  const [isAddOpen, setIsAddOpen] = useState(false);
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState<SmsTemplate | null>(null);
-  
+  const [isAddingTemplate, setIsAddingTemplate] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<SmsTemplate | null>(null);
+
+  // دریافت لیست الگوهای پیامک
   const { data: templates = [], isLoading } = useQuery<SmsTemplate[]>({
-    queryKey: ["/api/sms-templates"],
+    queryKey: ['/api/sms/templates'],
+    queryFn: async () => {
+      const res = await fetch('/api/sms/templates');
+      if (!res.ok) throw new Error('خطا در دریافت الگوهای پیامک');
+      return res.json();
+    }
   });
 
-  const form = useForm<TemplateFormValues>({
+  // تعریف فرم
+  const form = useForm<TemplateFormData>({
     resolver: zodResolver(templateFormSchema),
     defaultValues: {
-      name: "",
-      content: "",
+      name: '',
+      content: '',
     },
   });
-  
-  const createTemplate = useMutation({
-    mutationFn: (values: TemplateFormValues) => 
-      apiRequest("POST", "/api/sms-templates", values),
-    onSuccess: async () => {
+
+  // استفاده از میوتیشن برای افزودن الگوی جدید
+  const addTemplateMutation = useMutation({
+    mutationFn: async (data: TemplateFormData) => {
+      const res = await apiRequest('POST', '/api/sms/templates', data);
+      return res.json();
+    },
+    onSuccess: () => {
       toast({
-        title: "الگو با موفقیت ایجاد شد",
-        description: "الگوی پیامک جدید با موفقیت ایجاد شد",
+        title: 'الگوی جدید',
+        description: 'الگوی پیامک با موفقیت اضافه شد',
+        variant: 'default',
       });
+      queryClient.invalidateQueries({ queryKey: ['/api/sms/templates'] });
       form.reset();
-      setIsAddOpen(false);
-      await queryClient.invalidateQueries({ queryKey: ["/api/sms-templates"] });
+      setIsAddingTemplate(false);
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
-        title: "خطا در ایجاد الگو",
+        title: 'خطا',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     },
   });
-  
-  const updateTemplate = useMutation({
-    mutationFn: (values: TemplateFormValues) => 
-      apiRequest("PATCH", `/api/sms-templates/${selectedTemplate?.id}`, values),
-    onSuccess: async () => {
-      toast({
-        title: "الگو با موفقیت بروزرسانی شد",
-        description: "الگوی پیامک با موفقیت بروزرسانی شد",
+
+  // استفاده از میوتیشن برای ویرایش الگو
+  const updateTemplateMutation = useMutation({
+    mutationFn: async (data: TemplateFormData & { id: number }) => {
+      const res = await apiRequest('PATCH', `/api/sms/templates/${data.id}`, {
+        name: data.name,
+        content: data.content,
       });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: 'ویرایش الگو',
+        description: 'الگوی پیامک با موفقیت ویرایش شد',
+        variant: 'default',
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/sms/templates'] });
       form.reset();
-      setIsEditOpen(false);
-      setSelectedTemplate(null);
-      await queryClient.invalidateQueries({ queryKey: ["/api/sms-templates"] });
+      setEditingTemplate(null);
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
-        title: "خطا در بروزرسانی الگو",
+        title: 'خطا',
         description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-  
-  const deleteTemplate = useMutation({
-    mutationFn: () => 
-      apiRequest("DELETE", `/api/sms-templates/${selectedTemplate?.id}`),
-    onSuccess: async () => {
-      toast({
-        title: "الگو با موفقیت حذف شد",
-        description: "الگوی پیامک با موفقیت حذف شد",
-      });
-      setIsDeleteOpen(false);
-      setSelectedTemplate(null);
-      await queryClient.invalidateQueries({ queryKey: ["/api/sms-templates"] });
-    },
-    onError: (error) => {
-      toast({
-        title: "خطا در حذف الگو",
-        description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     },
   });
 
-  const handleAddTemplate = () => {
+  // استفاده از میوتیشن برای حذف الگو
+  const deleteTemplateMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest('DELETE', `/api/sms/templates/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: 'حذف الگو',
+        description: 'الگوی پیامک با موفقیت حذف شد',
+        variant: 'default',
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/sms/templates'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'خطا',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // شروع ویرایش الگو
+  const startEditTemplate = (template: SmsTemplate) => {
+    setEditingTemplate(template);
+    form.reset({
+      name: template.name,
+      content: template.content,
+    });
+  };
+
+  // لغو افزودن/ویرایش الگو
+  const cancelEdit = () => {
+    setIsAddingTemplate(false);
+    setEditingTemplate(null);
     form.reset();
-    setIsAddOpen(true);
   };
 
-  const handleEditTemplate = (template: SmsTemplate) => {
-    form.reset();
-    form.setValue("name", template.name);
-    form.setValue("content", template.content);
-    setSelectedTemplate(template);
-    setIsEditOpen(true);
-  };
-
-  const handleDeleteTemplate = (template: SmsTemplate) => {
-    setSelectedTemplate(template);
-    setIsDeleteOpen(true);
-  };
-  
-  const onAddSubmit = (values: TemplateFormValues) => {
-    createTemplate.mutate(values);
-  };
-  
-  const onEditSubmit = (values: TemplateFormValues) => {
-    updateTemplate.mutate(values);
-  };
-  
-  const onDeleteConfirm = () => {
-    deleteTemplate.mutate();
-  };
-
-  const selectSmsTemplate = (template: SmsTemplate) => {
-    // This function would set the template text in the parent component
-    // We'll implement this through props in a real implementation
+  // ارسال فرم
+  const onSubmit = (data: TemplateFormData) => {
+    if (editingTemplate) {
+      updateTemplateMutation.mutate({ ...data, id: editingTemplate.id });
+    } else {
+      addTemplateMutation.mutate(data);
+    }
   };
 
   return (
-    <>
-      <Card className="h-full">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>الگوهای پیامک</CardTitle>
-          <Button size="icon" variant="ghost" onClick={handleAddTemplate}>
-            <PlusCircle className="h-5 w-5" />
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {isLoading ? (
-              <div className="text-center py-4">در حال بارگذاری...</div>
-            ) : templates.length === 0 ? (
-              <div className="text-center py-4">هیچ الگویی یافت نشد</div>
-            ) : (
-              templates.map((template) => (
-                <div
-                  key={template.id}
-                  className="border rounded-md p-3 hover:bg-gray-50 cursor-pointer"
-                  onClick={() => selectSmsTemplate(template)}
-                >
-                  <div className="flex justify-between items-center mb-1">
-                    <h4 className="font-medium text-gray-900">{template.name}</h4>
-                    <div className="flex space-x-1 space-x-reverse">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEditTemplate(template);
-                        }}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteTemplate(template);
-                        }}
-                      >
-                        <Trash className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  <p className="text-sm text-gray-600 truncate">
-                    {template.content}
-                  </p>
-                </div>
-              ))
-            )}
+    <Card className="w-full">
+      <CardHeader className="pb-4">
+        <div className="flex justify-between items-center">
+          <div>
+            <CardTitle>الگوهای پیامک</CardTitle>
+            <CardDescription>مدیریت الگوهای پیامک</CardDescription>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Add Template Dialog */}
-      <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>افزودن الگوی جدید</DialogTitle>
-            <DialogDescription>
-              یک الگوی پیامک جدید ایجاد کنید.
-            </DialogDescription>
-          </DialogHeader>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onAddSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>نام الگو</FormLabel>
-                    <FormControl>
-                      <Input placeholder="نام الگو" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="content"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>متن الگو</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="متن الگو"
-                        rows={4}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsAddOpen(false)}
-                >
-                  انصراف
-                </Button>
-                <Button type="submit" disabled={createTemplate.isPending}>
-                  {createTemplate.isPending ? "در حال ثبت..." : "افزودن"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Template Dialog */}
-      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>ویرایش الگو</DialogTitle>
-            <DialogDescription>
-              الگوی پیامک را ویرایش کنید.
-            </DialogDescription>
-          </DialogHeader>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>نام الگو</FormLabel>
-                    <FormControl>
-                      <Input placeholder="نام الگو" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="content"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>متن الگو</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="متن الگو"
-                        rows={4}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsEditOpen(false)}
-                >
-                  انصراف
-                </Button>
-                <Button type="submit" disabled={updateTemplate.isPending}>
-                  {updateTemplate.isPending ? "در حال ذخیره..." : "ذخیره تغییرات"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Template Dialog */}
-      <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>حذف الگو</DialogTitle>
-            <DialogDescription>
-              آیا از حذف این الگو اطمینان دارید؟ این عمل غیرقابل بازگشت است.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
+          {!isAddingTemplate && !editingTemplate && (
             <Button
-              type="button"
               variant="outline"
-              onClick={() => setIsDeleteOpen(false)}
+              size="sm"
+              onClick={() => setIsAddingTemplate(true)}
+              className="flex items-center gap-1"
             >
-              انصراف
+              <Plus className="h-4 w-4" />
+              الگوی جدید
             </Button>
-            <Button 
-              variant="destructive"
-              onClick={onDeleteConfirm}
-              disabled={deleteTemplate.isPending}
-            >
-              {deleteTemplate.isPending ? "در حال حذف..." : "حذف"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        {/* فرم افزودن/ویرایش الگو */}
+        {(isAddingTemplate || editingTemplate) && (
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mb-6">
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-sm font-medium">
+                  {editingTemplate ? 'ویرایش الگو' : 'الگوی جدید'}
+                </h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={cancelEdit}
+                  type="button"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {/* نام الگو */}
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>نام الگو</FormLabel>
+                    <FormControl>
+                      <Input placeholder="نام الگو..." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* متن الگو */}
+              <FormField
+                control={form.control}
+                name="content"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>متن الگو</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="متن الگو را وارد کنید..."
+                        className="min-h-[100px]"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                    <div className="text-xs text-gray-500 mt-1">
+                      {field.value.length}/160 کاراکتر
+                    </div>
+                  </FormItem>
+                )}
+              />
+
+              {/* دکمه ذخیره */}
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={addTemplateMutation.isPending || updateTemplateMutation.isPending}
+              >
+                {(addTemplateMutation.isPending || updateTemplateMutation.isPending) ? (
+                  <>
+                    <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                    در حال ذخیره...
+                  </>
+                ) : (
+                  <>ذخیره الگو</>
+                )}
+              </Button>
+            </form>
+          </Form>
+        )}
+
+        {/* لیست الگوهای پیامک */}
+        {isLoading ? (
+          <div className="flex justify-center items-center py-6">
+            <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+          </div>
+        ) : templates.length === 0 ? (
+          <div className="text-center text-gray-500 py-6">
+            هیچ الگویی وجود ندارد
+          </div>
+        ) : (
+          <Accordion type="single" collapsible className="w-full">
+            {templates.map((template) => (
+              <AccordionItem key={template.id} value={template.id.toString()}>
+                <AccordionTrigger className="text-sm font-medium">
+                  {template.name}
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="text-sm text-gray-700 mb-2 whitespace-pre-wrap">
+                    {template.content}
+                  </div>
+                  <div className="flex justify-end gap-2 mt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => startEditTemplate(template)}
+                      disabled={editingTemplate !== null || isAddingTemplate}
+                    >
+                      <Pencil className="h-3.5 w-3.5 ml-1" />
+                      ویرایش
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          disabled={deleteTemplateMutation.isPending}
+                        >
+                          <Trash2 className="h-3.5 w-3.5 ml-1" />
+                          حذف
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>حذف الگوی پیامک</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            آیا از حذف الگوی "{template.name}" اطمینان دارید؟ این عملیات قابل بازگشت نیست.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>انصراف</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => deleteTemplateMutation.mutate(template.id)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            {deleteTemplateMutation.isPending ? (
+                              <>
+                                <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                                در حال حذف...
+                              </>
+                            ) : (
+                              <>حذف</>
+                            )}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        )}
+      </CardContent>
+    </Card>
   );
 }
