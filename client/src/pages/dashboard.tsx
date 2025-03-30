@@ -73,7 +73,7 @@ export default function Dashboard() {
           value={isLoadingCustomer ? "..." : pendingCustomerRequests.length.toString()}
           icon={<Users className="h-5 w-5 text-blue-500" />}
           color="blue-500"
-          onClick={() => window.open("/customer-request-form", "_blank")}
+          onClick={() => window.open("http://localhost:5000/customer-request-form", "_blank")}
         />
       </div>
 
