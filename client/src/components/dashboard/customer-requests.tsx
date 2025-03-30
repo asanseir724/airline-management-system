@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns-jalali";
 import {
   Table,
@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Eye, Loader2 } from "lucide-react";
-import { CustomerRequest } from "@shared/schema";
+import { CustomerRequest, SmsTemplate } from "@shared/schema";
 import { useState } from "react";
 import {
   Dialog,
@@ -35,9 +35,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 // Status badge component
 function getStatusBadge(status: string) {
@@ -62,10 +63,21 @@ interface CustomerRequestDetailProps {
 function CustomerRequestDetail({ request, onClose }: CustomerRequestDetailProps) {
   const { toast } = useToast();
   const [status, setStatus] = useState(request.status);
+  const [selectedTemplate, setSelectedTemplate] = useState<string>("");
+  const [sendSms, setSendSms] = useState(true);
+  
+  // دریافت الگوهای پیامک
+  const { data: templates = [] } = useQuery<SmsTemplate[]>({
+    queryKey: ["/api/sms/templates"],
+  });
   
   const updateStatusMutation = useMutation({
     mutationFn: async (newStatus: string) => {
-      const res = await apiRequest("PATCH", `/api/customer-requests/${request.id}/status`, { status: newStatus });
+      const res = await apiRequest("PATCH", `/api/customer-requests/${request.id}/status`, { 
+        status: newStatus,
+        sendSms: sendSms,
+        smsTemplate: selectedTemplate || undefined
+      });
       return await res.json();
     },
     onSuccess: () => {
@@ -87,7 +99,10 @@ function CustomerRequestDetail({ request, onClose }: CustomerRequestDetailProps)
   
   const handleStatusChange = (value: string) => {
     setStatus(value);
-    updateStatusMutation.mutate(value);
+  };
+  
+  const handleSaveStatus = () => {
+    updateStatusMutation.mutate(status);
   };
   
   return (
@@ -150,18 +165,58 @@ function CustomerRequestDetail({ request, onClose }: CustomerRequestDetailProps)
         </div>
       </div>
       
+      <div className="grid grid-cols-1 gap-4 my-4">
+        <div className="space-y-2">
+          <div className="flex items-center space-x-2 space-x-reverse">
+            <Checkbox 
+              id="sendSms" 
+              checked={sendSms} 
+              onCheckedChange={(checked) => setSendSms(checked as boolean)}
+            />
+            <Label htmlFor="sendSms">ارسال پیامک به مشتری</Label>
+          </div>
+        </div>
+        
+        {sendSms && (
+          <div className="space-y-2">
+            <Label htmlFor="smsTemplate" className="block text-sm font-medium">الگوی پیامک</Label>
+            <Select onValueChange={setSelectedTemplate} defaultValue="">
+              <SelectTrigger id="smsTemplate" className="w-full">
+                <SelectValue placeholder="انتخاب الگوی پیامک" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">الگوی پیش‌فرض بر اساس وضعیت</SelectItem>
+                {templates.map((template) => (
+                  <SelectItem key={template.id} value={template.name}>
+                    {template.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+      </div>
+      
       <div className="col-span-2 space-y-2 mt-4">
         <p className="text-sm font-medium">توضیحات:</p>
         <p className="text-sm text-gray-700 p-3 bg-gray-50 rounded-md min-h-20">{request.description || "بدون توضیحات"}</p>
       </div>
       
-      <div className="col-span-2 flex justify-between mt-4">
+      <div className="flex justify-between items-center mt-4">
         <div>
           <Badge variant={request.contactedSupport ? "outline" : "destructive"} className={request.contactedSupport ? "bg-green-100 text-green-800" : ""}>
             {request.contactedSupport ? "تماس با پشتیبانی: بله" : "تماس با پشتیبانی: خیر"}
           </Badge>
         </div>
-        <Button onClick={onClose}>بستن</Button>
+        <div className="space-x-2 space-x-reverse">
+          <Button onClick={onClose} variant="outline">بستن</Button>
+          <Button 
+            onClick={handleSaveStatus} 
+            disabled={updateStatusMutation.isPending}
+          >
+            {updateStatusMutation.isPending ? "در حال ذخیره..." : "ذخیره تغییرات"}
+          </Button>
+        </div>
       </div>
     </DialogContent>
   );

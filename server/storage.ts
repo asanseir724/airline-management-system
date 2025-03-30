@@ -85,13 +85,13 @@ export interface IStorage {
   clearSystemLogs(): Promise<boolean>;
   
   // Session store
-  sessionStore: SessionStore;
+  sessionStore: any;
 }
 
 // Database Storage Implementation
 export class DatabaseStorage implements IStorage {
   private db: ReturnType<typeof drizzle>;
-  readonly sessionStore: Express.SessionStore;
+  readonly sessionStore: any;
   
   constructor() {
     // Setup PostgreSQL connection

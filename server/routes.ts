@@ -78,7 +78,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/requests/:id/status", isAuthenticated, async (req, res, next) => {
     try {
       const id = parseInt(req.params.id);
-      const statusSchema = z.object({ status: z.enum(["pending", "approved", "rejected"]) });
+      const statusSchema = z.object({ 
+        status: z.enum(["pending", "approved", "rejected"]),
+        smsTemplate: z.string().optional(), // اضافه کردن فیلد اختیاری برای الگوی پیامک
+        sendSms: z.boolean().default(false) // آیا پیامک ارسال شود؟
+      });
       
       const validation = statusSchema.safeParse(req.body);
       if (!validation.success) {
@@ -88,6 +92,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const request = await storage.updateRequestStatus(id, validation.data.status);
       if (!request) {
         return res.status(404).json({ message: "Request not found" });
+      }
+      
+      // ارسال پیامک اگر کاربر درخواست داده باشد
+      if (validation.data.sendSms && request.phoneNumber) {
+        try {
+          const smsTemplates = await storage.getSmsTemplates();
+          let template;
+          
+          if (validation.data.smsTemplate) {
+            // استفاده از الگوی انتخاب شده توسط کاربر
+            template = smsTemplates.find(t => t.name === validation.data.smsTemplate);
+          } else {
+            // استفاده از الگوی پیش‌فرض بر اساس وضعیت
+            if (validation.data.status === "approved") {
+              template = smsTemplates.find(t => t.name === "تایید درخواست");
+            } else if (validation.data.status === "rejected") {
+              template = smsTemplates.find(t => t.name === "رد درخواست");
+            }
+          }
+          
+          if (template) {
+            // ارسال پیامک از طریق سرویس AmootSMS
+            await SmsService.sendSms(request.phoneNumber, template.content, request.id);
+            
+            // ثبت لاگ سیستم
+            await storage.createSystemLog({
+              level: 'info',
+              message: `پیامک وضعیت به شماره ${request.phoneNumber} ارسال شد`,
+              module: 'sms-service',
+              details: { templateName: template.name, requestId: request.id }
+            });
+          } else {
+            // اگر الگو یافت نشد
+            await storage.createSystemLog({
+              level: 'warning',
+              message: `الگوی پیامک مورد نظر یافت نشد`,
+              module: 'sms-service',
+              details: { templateName: validation.data.smsTemplate, requestId: request.id }
+            });
+          }
+        } catch (smsError) {
+          console.error('Error sending status update SMS:', smsError);
+          // ثبت خطا در لاگ‌های سیستم
+          await storage.createSystemLog({
+            level: 'error',
+            message: `خطا در ارسال پیامک وضعیت به شماره ${request.phoneNumber}`,
+            module: 'sms-service',
+            details: { error: smsError instanceof Error ? smsError.message : 'خطای ناشناخته', requestId: request.id }
+          });
+        }
       }
       
       res.json(request);
@@ -364,7 +418,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/customer-requests/:id/status", isAuthenticated, async (req, res, next) => {
     try {
       const id = parseInt(req.params.id);
-      const statusSchema = z.object({ status: z.enum(["pending", "approved", "rejected"]) });
+      const statusSchema = z.object({ 
+        status: z.enum(["pending", "approved", "rejected"]),
+        smsTemplate: z.string().optional(), // اضافه کردن فیلد اختیاری برای الگوی پیامک
+        sendSms: z.boolean().default(true) // به صورت پیش‌فرض پیامک ارسال شود
+      });
       
       const validation = statusSchema.safeParse(req.body);
       if (!validation.success) {
@@ -376,25 +434,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "درخواست مورد نظر یافت نشد" });
       }
       
-      // Send appropriate SMS based on status
-      if (request) {
-        const smsTemplates = await storage.getSmsTemplates();
-        let template;
-        
-        if (validation.data.status === "approved") {
-          template = smsTemplates.find(t => t.name === "تایید درخواست");
-        } else if (validation.data.status === "rejected") {
-          template = smsTemplates.find(t => t.name === "رد درخواست");
-        }
-        
-        if (template) {
-          try {
+      // ارسال پیامک اگر کاربر درخواست داده باشد
+      if (validation.data.sendSms && request.phoneNumber) {
+        try {
+          const smsTemplates = await storage.getSmsTemplates();
+          let template;
+          
+          if (validation.data.smsTemplate) {
+            // استفاده از الگوی انتخاب شده توسط کاربر
+            template = smsTemplates.find(t => t.name === validation.data.smsTemplate);
+          } else {
+            // استفاده از الگوی پیش‌فرض بر اساس وضعیت
+            if (validation.data.status === "approved") {
+              template = smsTemplates.find(t => t.name === "تایید درخواست");
+            } else if (validation.data.status === "rejected") {
+              template = smsTemplates.find(t => t.name === "رد درخواست");
+            } else if (validation.data.status === "pending") {
+              template = smsTemplates.find(t => t.name === "درحال برسی");
+            }
+          }
+          
+          if (template) {
             // ارسال پیامک از طریق سرویس AmootSMS
             await SmsService.sendSms(request.phoneNumber, template.content, request.id);
-          } catch (smsError) {
-            console.error('Error sending status update SMS:', smsError);
-            // در صورت خطا، فقط لاگ می‌کنیم و اجازه می‌دهیم درخواست ادامه یابد
+            
+            // ثبت لاگ سیستم
+            await storage.createSystemLog({
+              level: 'info',
+              message: `پیامک وضعیت به شماره ${request.phoneNumber} ارسال شد`,
+              module: 'sms-service',
+              details: { templateName: template.name, requestId: request.id }
+            });
+          } else {
+            // اگر الگو یافت نشد
+            await storage.createSystemLog({
+              level: 'warning',
+              message: `الگوی پیامک مورد نظر یافت نشد`,
+              module: 'sms-service',
+              details: { templateName: validation.data.smsTemplate, requestId: request.id }
+            });
           }
+        } catch (smsError) {
+          console.error('Error sending status update SMS:', smsError);
+          // ثبت خطا در لاگ‌های سیستم
+          await storage.createSystemLog({
+            level: 'error',
+            message: `خطا در ارسال پیامک وضعیت به شماره ${request.phoneNumber}`,
+            module: 'sms-service',
+            details: { error: smsError instanceof Error ? smsError.message : 'خطای ناشناخته', requestId: request.id }
+          });
         }
       }
       

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -9,11 +9,20 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Request } from "@shared/schema";
+import { Request, SmsTemplate } from "@shared/schema";
 import { format } from "date-fns-jalali";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 interface RequestDetailProps {
   request: Request;
@@ -22,10 +31,21 @@ interface RequestDetailProps {
 
 export function RequestDetail({ request, onClose }: RequestDetailProps) {
   const { toast } = useToast();
+  const [selectedTemplate, setSelectedTemplate] = useState<string>("");
+  const [sendSms, setSendSms] = useState(true);
+
+  // دریافت الگوهای پیامک
+  const { data: templates = [] } = useQuery<SmsTemplate[]>({
+    queryKey: ["/api/sms/templates"],
+  });
 
   const updateStatus = useMutation({
     mutationFn: (status: string) =>
-      apiRequest("PATCH", `/api/requests/${request.id}/status`, { status }),
+      apiRequest("PATCH", `/api/requests/${request.id}/status`, { 
+        status,
+        sendSms: sendSms,
+        smsTemplate: selectedTemplate || undefined
+      }),
     onSuccess: async () => {
       toast({
         title: "وضعیت بروزرسانی شد",
@@ -117,6 +137,40 @@ export function RequestDetail({ request, onClose }: RequestDetailProps) {
             <span className="block text-gray-500 mb-1">وضعیت</span>
             {getStatusBadge(request.status)}
           </div>
+          
+          {request.status === "pending" && (
+            <>
+              <div className="sm:col-span-2">
+                <div className="flex items-center space-x-2 space-x-reverse">
+                  <Checkbox 
+                    id="sendSms" 
+                    checked={sendSms} 
+                    onCheckedChange={(checked) => setSendSms(checked as boolean)}
+                  />
+                  <Label htmlFor="sendSms">ارسال پیامک به مشتری</Label>
+                </div>
+              </div>
+              
+              {sendSms && (
+                <div className="sm:col-span-2">
+                  <Label htmlFor="smsTemplate" className="block text-gray-500 mb-1">الگوی پیامک</Label>
+                  <Select onValueChange={setSelectedTemplate}>
+                    <SelectTrigger id="smsTemplate" className="w-full">
+                      <SelectValue placeholder="انتخاب الگوی پیامک" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">الگوی پیش‌فرض بر اساس وضعیت</SelectItem>
+                      {templates.map((template) => (
+                        <SelectItem key={template.id} value={template.name}>
+                          {template.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </>
+          )}
         </div>
 
         <DialogFooter className="mt-4">
