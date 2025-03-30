@@ -165,3 +165,36 @@ export type InsertBackupHistory = z.infer<typeof insertBackupHistorySchema>;
 
 export type BackupSettings = typeof backupSettings.$inferSelect;
 export type InsertBackupSettings = z.infer<typeof insertBackupSettingsSchema>;
+
+// CustomerRequest Schema
+export const customerRequests = pgTable("customer_requests", {
+  id: serial("id").primaryKey(),
+  email: text("email"),
+  website: text("website").notNull(),
+  refundReason: text("refund_reason").notNull(),
+  voucherNumber: text("voucher_number").notNull(),
+  phoneNumber: text("phone_number").notNull(),
+  ibanNumber: text("iban_number").notNull(),
+  accountOwner: text("account_owner").notNull(),
+  description: text("description"),
+  contactedSupport: boolean("contacted_support").notNull().default(false),
+  acceptTerms: boolean("accept_terms").notNull().default(false),
+  status: text("status").notNull().default("pending"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertCustomerRequestSchema = createInsertSchema(customerRequests).pick({
+  email: true,
+  website: true,
+  refundReason: true,
+  voucherNumber: true,
+  phoneNumber: true,
+  ibanNumber: true,
+  accountOwner: true,
+  description: true,
+  contactedSupport: true,
+  acceptTerms: true,
+});
+
+export type CustomerRequest = typeof customerRequests.$inferSelect;
+export type InsertCustomerRequest = z.infer<typeof insertCustomerRequestSchema>;

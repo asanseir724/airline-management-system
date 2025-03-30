@@ -2,15 +2,20 @@ import React from "react";
 import { AirlineLayout } from "@/components/airline-layout";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { RecentRequests } from "@/components/dashboard/recent-requests";
+import { CustomerRequestsComponent } from "@/components/dashboard/customer-requests";
 import { useQuery } from "@tanstack/react-query";
-import { Request } from "@shared/schema";
-import { AlertCircle, CheckCircle, Clock } from "lucide-react";
+import { Request, CustomerRequest } from "@shared/schema";
+import { AlertCircle, CheckCircle, Clock, Users } from "lucide-react";
 import { useLocation } from "wouter";
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { data: requests = [], isLoading } = useQuery<Request[]>({
     queryKey: ["/api/requests"],
+  });
+  
+  const { data: customerRequests = [], isLoading: isLoadingCustomer } = useQuery<CustomerRequest[]>({
+    queryKey: ["/api/customer-requests"],
   });
 
   const pendingRequests = requests.filter(
@@ -21,6 +26,10 @@ export default function Dashboard() {
   );
   const rejectedRequests = requests.filter(
     (request) => request.status === "rejected"
+  );
+  
+  const pendingCustomerRequests = customerRequests.filter(
+    (request) => request.status === "pending"
   );
 
   const handleViewAll = (status?: string) => {
@@ -37,7 +46,7 @@ export default function Dashboard() {
       title="داشبورد مدیریت" 
       subtitle="خلاصه وضعیت سیستم و آمار درخواست‌ها"
     >
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <StatCard
           title="درخواست‌های در انتظار"
           value={isLoading ? "..." : pendingRequests.length.toString()}
@@ -59,9 +68,19 @@ export default function Dashboard() {
           color="red-500"
           onClick={() => handleViewAll("rejected")}
         />
+        <StatCard
+          title="درخواست‌های استرداد مشتریان"
+          value={isLoadingCustomer ? "..." : pendingCustomerRequests.length.toString()}
+          icon={<Users className="h-5 w-5 text-blue-500" />}
+          color="blue-500"
+          onClick={() => window.open("/customer-request", "_blank")}
+        />
       </div>
 
-      <RecentRequests />
+      <div className="grid grid-cols-1 gap-8 mb-8">
+        <RecentRequests />
+        <CustomerRequestsComponent />
+      </div>
     </AirlineLayout>
   );
 }

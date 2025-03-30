@@ -10,6 +10,7 @@ import RequestForm from "@/pages/request-form";
 import SmsManagement from "@/pages/sms-management";
 import TelegramIntegration from "@/pages/telegram-integration";
 import Backup from "@/pages/backup";
+import CustomerRequestForm from "@/pages/customer-request-form";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-auth";
 
@@ -23,6 +24,7 @@ function Router() {
       <ProtectedRoute path="/telegram-integration" component={TelegramIntegration} />
       <ProtectedRoute path="/backup" component={Backup} />
       <Route path="/auth" component={AuthPage} />
+      <Route path="/customer-request" component={CustomerRequestForm} />
       <Route component={NotFound} />
     </Switch>
   );

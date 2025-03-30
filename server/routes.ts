@@ -7,7 +7,8 @@ import {
   insertSmsTemplateSchema, 
   insertSmsHistorySchema,
   insertTelegramConfigSchema,
-  insertBackupSettingsSchema
+  insertBackupSettingsSchema,
+  insertCustomerRequestSchema
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -264,6 +265,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Backup settings not found" });
       }
       res.json(settings);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  // Customer Request routes
+  app.post("/api/customer-requests", async (req, res, next) => {
+    try {
+      const validation = insertCustomerRequestSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ message: "اطلاعات درخواست معتبر نیست", errors: validation.error.errors });
+      }
+      
+      const request = await storage.createCustomerRequest(validation.data);
+      
+      // If there's a telegram config, simulate sending to telegram
+      const telegramConfig = await storage.getTelegramConfig();
+      if (telegramConfig && telegramConfig.isActive) {
+        await storage.createTelegramHistory({
+          requestId: request.id,
+          customerName: request.accountOwner, // Using account owner name as customer name
+          requestType: "refund",
+          status: "sent"
+        });
+      }
+      
+      // Send confirmation SMS if configured
+      const smsTemplates = await storage.getSmsTemplates();
+      const pendingTemplate = smsTemplates.find(t => t.name === "در حال بررسی");
+      if (pendingTemplate) {
+        await storage.createSmsHistory({
+          phoneNumber: request.phoneNumber,
+          content: pendingTemplate.content,
+          status: "sent"
+        });
+      }
+      
+      res.status(201).json(request);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.get("/api/customer-requests", isAuthenticated, async (req, res, next) => {
+    try {
+      const requests = await storage.getCustomerRequests();
+      res.json(requests);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.get("/api/customer-requests/:id", isAuthenticated, async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id);
+      const request = await storage.getCustomerRequestById(id);
+      if (!request) {
+        return res.status(404).json({ message: "درخواست مورد نظر یافت نشد" });
+      }
+      res.json(request);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.patch("/api/customer-requests/:id/status", isAuthenticated, async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id);
+      const statusSchema = z.object({ status: z.enum(["pending", "approved", "rejected"]) });
+      
+      const validation = statusSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ message: "وضعیت نامعتبر است", errors: validation.error.errors });
+      }
+      
+      const request = await storage.updateCustomerRequestStatus(id, validation.data.status);
+      if (!request) {
+        return res.status(404).json({ message: "درخواست مورد نظر یافت نشد" });
+      }
+      
+      // Send appropriate SMS based on status
+      if (request) {
+        const smsTemplates = await storage.getSmsTemplates();
+        let template;
+        
+        if (validation.data.status === "approved") {
+          template = smsTemplates.find(t => t.name === "تایید درخواست");
+        } else if (validation.data.status === "rejected") {
+          template = smsTemplates.find(t => t.name === "رد درخواست");
+        }
+        
+        if (template) {
+          await storage.createSmsHistory({
+            phoneNumber: request.phoneNumber,
+            content: template.content,
+            status: "sent"
+          });
+        }
+      }
+      
+      res.json(request);
     } catch (error) {
       next(error);
     }

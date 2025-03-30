@@ -6,7 +6,8 @@ import {
   telegramConfig, type TelegramConfig, type InsertTelegramConfig,
   telegramHistory, type TelegramHistory, type InsertTelegramHistory,
   backupHistory, type BackupHistory, type InsertBackupHistory,
-  backupSettings, type BackupSettings, type InsertBackupSettings
+  backupSettings, type BackupSettings, type InsertBackupSettings,
+  customerRequests, type CustomerRequest, type InsertCustomerRequest
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
@@ -24,6 +25,12 @@ export interface IStorage {
   getRequestById(id: number): Promise<Request | undefined>;
   createRequest(request: InsertRequest): Promise<Request>;
   updateRequestStatus(id: number, status: 'pending' | 'approved' | 'rejected'): Promise<Request | undefined>;
+  
+  // Customer Request methods
+  getCustomerRequests(): Promise<CustomerRequest[]>;
+  getCustomerRequestById(id: number): Promise<CustomerRequest | undefined>;
+  createCustomerRequest(request: InsertCustomerRequest): Promise<CustomerRequest>;
+  updateCustomerRequestStatus(id: number, status: string): Promise<CustomerRequest | undefined>;
   
   // SMS Template methods
   getSmsTemplates(): Promise<SmsTemplate[]>;
@@ -62,6 +69,7 @@ export interface IStorage {
 export class MemStorage implements IStorage {
   private users: Map<number, User>;
   private requests: Map<number, Request>;
+  private customerRequests: Map<number, CustomerRequest>;
   private smsTemplates: Map<number, SmsTemplate>;
   private smsHistory: Map<number, SmsHistory>;
   private telegramConfig: Map<number, TelegramConfig>;
@@ -73,6 +81,7 @@ export class MemStorage implements IStorage {
   
   private userCurrentId: number;
   private requestCurrentId: number;
+  private customerRequestCurrentId: number;
   private smsTemplateCurrentId: number;
   private smsHistoryCurrentId: number;
   private telegramConfigCurrentId: number;
@@ -83,6 +92,7 @@ export class MemStorage implements IStorage {
   constructor() {
     this.users = new Map();
     this.requests = new Map();
+    this.customerRequests = new Map();
     this.smsTemplates = new Map();
     this.smsHistory = new Map();
     this.telegramConfig = new Map();
@@ -92,6 +102,7 @@ export class MemStorage implements IStorage {
     
     this.userCurrentId = 1;
     this.requestCurrentId = 1;
+    this.customerRequestCurrentId = 1;
     this.smsTemplateCurrentId = 1;
     this.smsHistoryCurrentId = 1;
     this.telegramConfigCurrentId = 1;
@@ -193,6 +204,40 @@ export class MemStorage implements IStorage {
       updatedAt: new Date()
     };
     this.requests.set(id, updatedRequest);
+    return updatedRequest;
+  }
+  
+  // Customer Request methods
+  async getCustomerRequests(): Promise<CustomerRequest[]> {
+    return Array.from(this.customerRequests.values());
+  }
+  
+  async getCustomerRequestById(id: number): Promise<CustomerRequest | undefined> {
+    return this.customerRequests.get(id);
+  }
+  
+  async createCustomerRequest(insertRequest: InsertCustomerRequest): Promise<CustomerRequest> {
+    const id = this.customerRequestCurrentId++;
+    const now = new Date();
+    const request: CustomerRequest = {
+      ...insertRequest,
+      id,
+      status: 'pending',
+      createdAt: now
+    };
+    this.customerRequests.set(id, request);
+    return request;
+  }
+  
+  async updateCustomerRequestStatus(id: number, status: string): Promise<CustomerRequest | undefined> {
+    const request = this.customerRequests.get(id);
+    if (!request) return undefined;
+    
+    const updatedRequest: CustomerRequest = {
+      ...request,
+      status
+    };
+    this.customerRequests.set(id, updatedRequest);
     return updatedRequest;
   }
   
