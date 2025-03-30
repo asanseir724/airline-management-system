@@ -159,7 +159,7 @@ export function RequestDetail({ request, onClose }: RequestDetailProps) {
                       <SelectValue placeholder="انتخاب الگوی پیامک" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">الگوی پیش‌فرض بر اساس وضعیت</SelectItem>
+                      <SelectItem value="default">الگوی پیش‌فرض بر اساس وضعیت</SelectItem>
                       {templates.map((template) => (
                         <SelectItem key={template.id} value={template.name}>
                           {template.name}

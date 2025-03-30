@@ -100,7 +100,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const smsTemplates = await storage.getSmsTemplates();
           let template;
           
-          if (validation.data.smsTemplate) {
+          if (validation.data.smsTemplate && validation.data.smsTemplate !== "default") {
             // استفاده از الگوی انتخاب شده توسط کاربر
             template = smsTemplates.find(t => t.name === validation.data.smsTemplate);
           } else {
@@ -440,7 +440,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const smsTemplates = await storage.getSmsTemplates();
           let template;
           
-          if (validation.data.smsTemplate) {
+          if (validation.data.smsTemplate && validation.data.smsTemplate !== "default") {
             // استفاده از الگوی انتخاب شده توسط کاربر
             template = smsTemplates.find(t => t.name === validation.data.smsTemplate);
           } else {
