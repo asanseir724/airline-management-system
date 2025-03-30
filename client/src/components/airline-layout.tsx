@@ -15,6 +15,8 @@ import {
   LogOut,
   User,
   Settings,
+  Map,
+  Plane,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -48,7 +50,7 @@ export function AirlineLayout({ children, title, subtitle }: AirlineLayoutProps)
     });
   };
 
-  const navItems = [
+  const refundSystemItems = [
     {
       title: "داشبورد",
       href: "/",
@@ -83,6 +85,25 @@ export function AirlineLayout({ children, title, subtitle }: AirlineLayoutProps)
       title: "مدیریت سیستم",
       href: "/system-management",
       icon: <Settings className="h-5 w-5 ml-3" />,
+    },
+  ];
+  
+  const tourSystemItems = [
+    {
+      title: "مدیریت تورها",
+      href: "/tour-management",
+      icon: <Plane className="h-5 w-5 ml-3" />,
+    },
+  ];
+  
+  const navItems = [
+    {
+      title: "سامانه استرداد",
+      items: refundSystemItems,
+    },
+    {
+      title: "سیستم تورهای گردشگری",
+      items: tourSystemItems,
     },
   ];
 
@@ -148,23 +169,35 @@ export function AirlineLayout({ children, title, subtitle }: AirlineLayoutProps)
           )}
         >
           <nav className="mt-5 px-2">
-            {navItems.map((item) => (
-              <Link key={item.href} href={item.href}>
-                <Button
-                  variant={location === item.href ? "default" : "ghost"}
-                  className={cn(
-                    "w-full justify-start mb-1",
-                    location === item.href
-                      ? "bg-primary text-primary-foreground"
-                      : "text-gray-700 hover:bg-gray-100 hover:text-primary"
-                  )}
-                >
-                  {item.icon}
-                  <span className={cn(isSidebarOpen ? "inline-block" : "hidden md:hidden")}>
-                    {item.title}
-                  </span>
-                </Button>
-              </Link>
+            {navItems.map((category, categoryIndex) => (
+              <div key={categoryIndex} className="mb-6">
+                <h3 className={cn(
+                  "text-sm font-semibold text-gray-500 mb-2 px-2",
+                  !isSidebarOpen && "hidden md:hidden"
+                )}>
+                  {category.title}
+                </h3>
+                <div className="space-y-1">
+                  {category.items.map((item) => (
+                    <Link key={item.href} href={item.href}>
+                      <Button
+                        variant={location === item.href ? "default" : "ghost"}
+                        className={cn(
+                          "w-full justify-start mb-1",
+                          location === item.href
+                            ? "bg-primary text-primary-foreground"
+                            : "text-gray-700 hover:bg-gray-100 hover:text-primary"
+                        )}
+                      >
+                        {item.icon}
+                        <span className={cn(isSidebarOpen ? "inline-block" : "hidden md:hidden")}>
+                          {item.title}
+                        </span>
+                      </Button>
+                    </Link>
+                  ))}
+                </div>
+              </div>
             ))}
           </nav>
         </aside>
