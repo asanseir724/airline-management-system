@@ -14,6 +14,15 @@ import createMemoryStore from "memorystore";
 
 const MemoryStore = createMemoryStore(session);
 
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
+import connectPg from "connect-pg-simple";
+import dotenv from 'dotenv';
+import * as schema from '@shared/schema';
+import { eq, desc } from "drizzle-orm";
+
+dotenv.config();
+
 export interface IStorage {
   // User methods
   getUser(id: number): Promise<User | undefined>;
@@ -63,84 +72,71 @@ export interface IStorage {
   updateBackupSettings(id: number, settings: Partial<InsertBackupSettings>): Promise<BackupSettings | undefined>;
   
   // Session store
-  sessionStore: session.SessionStore;
+  sessionStore: SessionStore;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<number, User>;
-  private requests: Map<number, Request>;
-  private customerRequests: Map<number, CustomerRequest>;
-  private smsTemplates: Map<number, SmsTemplate>;
-  private smsHistory: Map<number, SmsHistory>;
-  private telegramConfig: Map<number, TelegramConfig>;
-  private telegramHistory: Map<number, TelegramHistory>;
-  private backupHistory: Map<number, BackupHistory>;
-  private backupSettings: Map<number, BackupSettings>;
+// Database Storage Implementation
+export class DatabaseStorage implements IStorage {
+  private db: ReturnType<typeof drizzle>;
+  readonly sessionStore: Express.SessionStore;
   
-  sessionStore: session.SessionStore;
-  
-  private userCurrentId: number;
-  private requestCurrentId: number;
-  private customerRequestCurrentId: number;
-  private smsTemplateCurrentId: number;
-  private smsHistoryCurrentId: number;
-  private telegramConfigCurrentId: number;
-  private telegramHistoryCurrentId: number;
-  private backupHistoryCurrentId: number;
-  private backupSettingsCurrentId: number;
-
   constructor() {
-    this.users = new Map();
-    this.requests = new Map();
-    this.customerRequests = new Map();
-    this.smsTemplates = new Map();
-    this.smsHistory = new Map();
-    this.telegramConfig = new Map();
-    this.telegramHistory = new Map();
-    this.backupHistory = new Map();
-    this.backupSettings = new Map();
+    // Setup PostgreSQL connection
+    const connectionString = process.env.DATABASE_URL!;
+    const client = postgres(connectionString);
+    this.db = drizzle(client, { schema });
     
-    this.userCurrentId = 1;
-    this.requestCurrentId = 1;
-    this.customerRequestCurrentId = 1;
-    this.smsTemplateCurrentId = 1;
-    this.smsHistoryCurrentId = 1;
-    this.telegramConfigCurrentId = 1;
-    this.telegramHistoryCurrentId = 1;
-    this.backupHistoryCurrentId = 1;
-    this.backupSettingsCurrentId = 1;
-    
-    this.sessionStore = new MemoryStore({
-      checkPeriod: 86400000, // prune expired entries every 24h
+    // Setup session store
+    const PostgresSessionStore = connectPg(session);
+    this.sessionStore = new PostgresSessionStore({
+      conObject: {
+        connectionString,
+      },
+      createTableIfMissing: true,
     });
     
-    // Add some default SMS templates
-    this.createSmsTemplate({
-      name: "تایید درخواست",
-      content: "✅ مشتری گرامی، درخواست شما تایید شد. با تشکر از اعتماد شما - شرکت هواپیمایی"
-    });
-    this.createSmsTemplate({
-      name: "رد درخواست",
-      content: "❌ مشتری گرامی، متاسفانه درخواست شما رد شد. لطفا برای اطلاعات بیشتر با پشتیبانی تماس بگیرید - شرکت هواپیمایی"
-    });
-    this.createSmsTemplate({
-      name: "در حال بررسی",
-      content: "✨ مشتری گرامی، درخواست شما با موفقیت ثبت شد و در حال بررسی است. با تشکر - شرکت هواپیمایی"
-    });
-    
-    // Add default backup settings
-    this.createBackupSettings({
-      frequency: "daily",
-      time: "00:00",
-      autoDelete: false,
-      isActive: true
-    });
-    
-    // Add default telegram config
-    this.createTelegramConfig({
-      botToken: "",
-      channelId: "@airlinerequeststest",
-      messageFormat: `✈️ درخواست جدید
+    // Init database
+    this.init();
+  }
+  
+  private async init() {
+    try {
+      // Check if we need to add default data
+      const smsTemplates = await this.getSmsTemplates();
+      if (smsTemplates.length === 0) {
+        // Add default SMS templates
+        await this.createSmsTemplate({
+          name: "تایید درخواست",
+          content: "✅ مشتری گرامی، درخواست شما تایید شد. با تشکر از اعتماد شما - شرکت هواپیمایی"
+        });
+        await this.createSmsTemplate({
+          name: "رد درخواست",
+          content: "❌ مشتری گرامی، متاسفانه درخواست شما رد شد. لطفا برای اطلاعات بیشتر با پشتیبانی تماس بگیرید - شرکت هواپیمایی"
+        });
+        await this.createSmsTemplate({
+          name: "در حال بررسی",
+          content: "✨ مشتری گرامی، درخواست شما با موفقیت ثبت شد و در حال بررسی است. با تشکر - شرکت هواپیمایی"
+        });
+      }
+      
+      // Add default backup settings if needed
+      const backupSettings = await this.getBackupSettings();
+      if (!backupSettings) {
+        await this.createBackupSettings({
+          frequency: "daily",
+          time: "00:00",
+          autoDelete: false,
+          isActive: true
+        });
+      }
+      
+      // Add default telegram config if needed
+      const telegramConfig = await this.getTelegramConfig();
+      if (!telegramConfig) {
+        await this.createTelegramConfig({
+          botToken: "",
+          channelId: "@airlinerequeststest",
+          messageFormat: `✈️ درخواست جدید
 
 👤 نام مشتری: {customer_name}
 📱 شماره تماس: {phone_number}
@@ -148,252 +144,261 @@ export class MemStorage implements IStorage {
 📝 نوع درخواست: {request_type}
 
 توضیحات: {description}`,
-      isActive: true
-    });
+          isActive: true
+        });
+      }
+      
+      console.log("Database initialized successfully");
+    } catch (error) {
+      console.error("Error initializing database:", error);
+    }
   }
 
   // User methods
   async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
+    const result = await this.db.select().from(schema.users).where(eq(schema.users.id, id)).limit(1);
+    return result[0];
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    const result = await this.db.select().from(schema.users).where(eq(schema.users.username, username)).limit(1);
+    return result[0];
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.userCurrentId++;
-    const now = new Date();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
-    return user;
+    const result = await this.db.insert(schema.users).values({
+      username: insertUser.username,
+      password: insertUser.password,
+      displayName: insertUser.displayName || null,
+      isAdmin: insertUser.isAdmin || false
+    }).returning();
+    
+    return result[0];
   }
   
   // Request methods
   async getRequests(): Promise<Request[]> {
-    return Array.from(this.requests.values());
+    return await this.db.select().from(schema.requests).orderBy(desc(schema.requests.createdAt));
   }
   
   async getRequestById(id: number): Promise<Request | undefined> {
-    return this.requests.get(id);
+    const result = await this.db.select().from(schema.requests).where(eq(schema.requests.id, id)).limit(1);
+    return result[0];
   }
   
   async createRequest(insertRequest: InsertRequest): Promise<Request> {
-    const id = this.requestCurrentId++;
-    const now = new Date();
-    const request: Request = {
-      ...insertRequest,
-      id,
-      status: 'pending',
-      createdAt: now,
-      updatedAt: now
-    };
-    this.requests.set(id, request);
-    return request;
+    const result = await this.db.insert(schema.requests).values({
+      customerName: insertRequest.customerName,
+      phoneNumber: insertRequest.phoneNumber,
+      ticketNumber: insertRequest.ticketNumber,
+      requestType: insertRequest.requestType,
+      description: insertRequest.description || null
+    }).returning();
+    
+    return result[0];
   }
   
   async updateRequestStatus(id: number, status: 'pending' | 'approved' | 'rejected'): Promise<Request | undefined> {
-    const request = this.requests.get(id);
-    if (!request) return undefined;
+    const result = await this.db.update(schema.requests)
+      .set({ 
+        status: status,
+        updatedAt: new Date()
+      })
+      .where(eq(schema.requests.id, id))
+      .returning();
     
-    const updatedRequest: Request = {
-      ...request,
-      status,
-      updatedAt: new Date()
-    };
-    this.requests.set(id, updatedRequest);
-    return updatedRequest;
+    return result[0];
   }
   
   // Customer Request methods
   async getCustomerRequests(): Promise<CustomerRequest[]> {
-    return Array.from(this.customerRequests.values());
+    return await this.db.select().from(schema.customerRequests).orderBy(desc(schema.customerRequests.createdAt));
   }
   
   async getCustomerRequestById(id: number): Promise<CustomerRequest | undefined> {
-    return this.customerRequests.get(id);
+    const result = await this.db.select().from(schema.customerRequests).where(eq(schema.customerRequests.id, id)).limit(1);
+    return result[0];
   }
   
   async createCustomerRequest(insertRequest: InsertCustomerRequest): Promise<CustomerRequest> {
-    const id = this.customerRequestCurrentId++;
-    const now = new Date();
-    const request: CustomerRequest = {
-      ...insertRequest,
-      id,
-      status: 'pending',
-      createdAt: now
-    };
-    this.customerRequests.set(id, request);
-    return request;
+    const result = await this.db.insert(schema.customerRequests).values({
+      email: insertRequest.email || null,
+      website: insertRequest.website,
+      refundReason: insertRequest.refundReason,
+      voucherNumber: insertRequest.voucherNumber,
+      phoneNumber: insertRequest.phoneNumber,
+      ibanNumber: insertRequest.ibanNumber,
+      accountOwner: insertRequest.accountOwner,
+      description: insertRequest.description || null,
+      contactedSupport: insertRequest.contactedSupport || false,
+      acceptTerms: insertRequest.acceptTerms || false
+    }).returning();
+    
+    return result[0];
   }
   
   async updateCustomerRequestStatus(id: number, status: string): Promise<CustomerRequest | undefined> {
-    const request = this.customerRequests.get(id);
-    if (!request) return undefined;
+    const result = await this.db.update(schema.customerRequests)
+      .set({ status })
+      .where(eq(schema.customerRequests.id, id))
+      .returning();
     
-    const updatedRequest: CustomerRequest = {
-      ...request,
-      status
-    };
-    this.customerRequests.set(id, updatedRequest);
-    return updatedRequest;
+    return result[0];
   }
   
   // SMS Template methods
   async getSmsTemplates(): Promise<SmsTemplate[]> {
-    return Array.from(this.smsTemplates.values());
+    return await this.db.select().from(schema.smsTemplates);
   }
   
   async getSmsTemplateById(id: number): Promise<SmsTemplate | undefined> {
-    return this.smsTemplates.get(id);
+    const result = await this.db.select().from(schema.smsTemplates).where(eq(schema.smsTemplates.id, id)).limit(1);
+    return result[0];
   }
   
   async createSmsTemplate(insertTemplate: InsertSmsTemplate): Promise<SmsTemplate> {
-    const id = this.smsTemplateCurrentId++;
-    const now = new Date();
-    const template: SmsTemplate = {
-      ...insertTemplate,
-      id,
-      createdAt: now
-    };
-    this.smsTemplates.set(id, template);
-    return template;
+    const result = await this.db.insert(schema.smsTemplates).values({
+      name: insertTemplate.name,
+      content: insertTemplate.content
+    }).returning();
+    
+    return result[0];
   }
   
   async updateSmsTemplate(id: number, template: Partial<InsertSmsTemplate>): Promise<SmsTemplate | undefined> {
-    const existingTemplate = this.smsTemplates.get(id);
-    if (!existingTemplate) return undefined;
+    const result = await this.db.update(schema.smsTemplates)
+      .set(template)
+      .where(eq(schema.smsTemplates.id, id))
+      .returning();
     
-    const updatedTemplate: SmsTemplate = {
-      ...existingTemplate,
-      ...template
-    };
-    this.smsTemplates.set(id, updatedTemplate);
-    return updatedTemplate;
+    return result[0];
   }
   
   async deleteSmsTemplate(id: number): Promise<boolean> {
-    return this.smsTemplates.delete(id);
+    const result = await this.db.delete(schema.smsTemplates)
+      .where(eq(schema.smsTemplates.id, id));
+    
+    return !!result;
   }
   
   // SMS History methods
   async getSmsHistory(): Promise<SmsHistory[]> {
-    return Array.from(this.smsHistory.values());
+    return await this.db.select().from(schema.smsHistory).orderBy(desc(schema.smsHistory.createdAt));
   }
   
   async createSmsHistory(insertHistory: InsertSmsHistory): Promise<SmsHistory> {
-    const id = this.smsHistoryCurrentId++;
-    const now = new Date();
-    const history: SmsHistory = {
-      ...insertHistory,
-      id,
-      createdAt: now
-    };
-    this.smsHistory.set(id, history);
-    return history;
+    const result = await this.db.insert(schema.smsHistory).values({
+      requestId: insertHistory.requestId || null,
+      phoneNumber: insertHistory.phoneNumber,
+      content: insertHistory.content,
+      status: insertHistory.status
+    }).returning();
+    
+    return result[0];
   }
   
   // Telegram Config methods
   async getTelegramConfig(): Promise<TelegramConfig | undefined> {
-    if (this.telegramConfig.size === 0) return undefined;
-    return Array.from(this.telegramConfig.values())[0]; // Return the first config
+    const result = await this.db.select().from(schema.telegramConfig).limit(1);
+    return result[0];
   }
   
   async createTelegramConfig(insertConfig: InsertTelegramConfig): Promise<TelegramConfig> {
-    const id = this.telegramConfigCurrentId++;
-    const now = new Date();
-    const config: TelegramConfig = {
-      ...insertConfig,
-      id,
-      updatedAt: now
-    };
-    this.telegramConfig.set(id, config);
-    return config;
+    const result = await this.db.insert(schema.telegramConfig).values({
+      botToken: insertConfig.botToken,
+      channelId: insertConfig.channelId,
+      messageFormat: insertConfig.messageFormat,
+      isActive: insertConfig.isActive !== undefined ? insertConfig.isActive : true
+    }).returning();
+    
+    return result[0];
   }
   
   async updateTelegramConfig(id: number, config: Partial<InsertTelegramConfig>): Promise<TelegramConfig | undefined> {
-    const existingConfig = this.telegramConfig.get(id);
-    if (!existingConfig) return undefined;
+    const updateData: any = { ...config };
+    if (Object.keys(config).length > 0) {
+      updateData.updatedAt = new Date();
+    }
     
-    const updatedConfig: TelegramConfig = {
-      ...existingConfig,
-      ...config,
-      updatedAt: new Date()
-    };
-    this.telegramConfig.set(id, updatedConfig);
-    return updatedConfig;
+    const result = await this.db.update(schema.telegramConfig)
+      .set(updateData)
+      .where(eq(schema.telegramConfig.id, id))
+      .returning();
+    
+    return result[0];
   }
   
   // Telegram History methods
   async getTelegramHistory(): Promise<TelegramHistory[]> {
-    return Array.from(this.telegramHistory.values());
+    return await this.db.select().from(schema.telegramHistory).orderBy(desc(schema.telegramHistory.createdAt));
   }
   
   async createTelegramHistory(insertHistory: InsertTelegramHistory): Promise<TelegramHistory> {
-    const id = this.telegramHistoryCurrentId++;
-    const now = new Date();
-    const history: TelegramHistory = {
-      ...insertHistory,
-      id,
-      createdAt: now
-    };
-    this.telegramHistory.set(id, history);
-    return history;
+    const result = await this.db.insert(schema.telegramHistory).values({
+      requestId: insertHistory.requestId || null,
+      customerName: insertHistory.customerName,
+      requestType: insertHistory.requestType,
+      status: insertHistory.status
+    }).returning();
+    
+    return result[0];
   }
   
   // Backup History methods
   async getBackupHistory(): Promise<BackupHistory[]> {
-    return Array.from(this.backupHistory.values());
+    return await this.db.select().from(schema.backupHistory).orderBy(desc(schema.backupHistory.createdAt));
   }
   
   async createBackupHistory(insertHistory: InsertBackupHistory): Promise<BackupHistory> {
-    const id = this.backupHistoryCurrentId++;
-    const now = new Date();
-    const history: BackupHistory = {
-      ...insertHistory,
-      id,
-      createdAt: now
-    };
-    this.backupHistory.set(id, history);
-    return history;
+    const result = await this.db.insert(schema.backupHistory).values({
+      filename: insertHistory.filename,
+      size: insertHistory.size,
+      type: insertHistory.type
+    }).returning();
+    
+    return result[0];
   }
   
   async deleteBackupHistory(id: number): Promise<boolean> {
-    return this.backupHistory.delete(id);
+    const result = await this.db.delete(schema.backupHistory)
+      .where(eq(schema.backupHistory.id, id));
+    
+    return !!result;
   }
   
   // Backup Settings methods
   async getBackupSettings(): Promise<BackupSettings | undefined> {
-    if (this.backupSettings.size === 0) return undefined;
-    return Array.from(this.backupSettings.values())[0]; // Return the first settings
+    const result = await this.db.select().from(schema.backupSettings).limit(1);
+    return result[0];
   }
   
   async createBackupSettings(insertSettings: InsertBackupSettings): Promise<BackupSettings> {
-    const id = this.backupSettingsCurrentId++;
-    const now = new Date();
-    const settings: BackupSettings = {
-      ...insertSettings,
-      id,
-      updatedAt: now
-    };
-    this.backupSettings.set(id, settings);
-    return settings;
+    const result = await this.db.insert(schema.backupSettings).values({
+      frequency: insertSettings.frequency,
+      time: insertSettings.time,
+      autoDelete: insertSettings.autoDelete !== undefined ? insertSettings.autoDelete : false,
+      isActive: insertSettings.isActive !== undefined ? insertSettings.isActive : true
+    }).returning();
+    
+    return result[0];
   }
   
   async updateBackupSettings(id: number, settings: Partial<InsertBackupSettings>): Promise<BackupSettings | undefined> {
-    const existingSettings = this.backupSettings.get(id);
-    if (!existingSettings) return undefined;
+    const updateData: any = { ...settings };
+    if (Object.keys(settings).length > 0) {
+      updateData.updatedAt = new Date();
+    }
     
-    const updatedSettings: BackupSettings = {
-      ...existingSettings,
-      ...settings,
-      updatedAt: new Date()
-    };
-    this.backupSettings.set(id, updatedSettings);
-    return updatedSettings;
+    const result = await this.db.update(schema.backupSettings)
+      .set(updateData)
+      .where(eq(schema.backupSettings.id, id))
+      .returning();
+    
+    return result[0];
   }
 }
 
-export const storage = new MemStorage();
+// For session store type compatibility
+type SessionStore = Express.SessionStore;
+
+export const storage = new DatabaseStorage();
