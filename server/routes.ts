@@ -6,6 +6,7 @@ import { SmsService } from "./services/sms";
 import { TelegramService } from "./services/telegram";
 import { ReportService } from "./services/report";
 import { generateTelegramMessage } from "./services/telegram-message";
+import { scrapeTourSource } from "./services/scraping";
 import fileUpload, { UploadedFile } from "express-fileupload";
 
 // حذف تعریف interface چون با تایپ های express-fileupload تداخل دارد
@@ -1660,6 +1661,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // API اسکرپ کردن منبع تور
+  app.post("/api/tour-sources/:id/scrape", isAuthenticated, async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id);
+      const source = await storage.getTourSourceById(id);
+      
+      if (!source) {
+        return res.status(404).json({ message: "منبع تور یافت نشد" });
+      }
+      
+      // اسکرپ کردن منبع تور با استفاده از سرویس اسکرپینگ
+      const success = await scrapeTourSource(source);
+      
+      if (success) {
+        // ثبت لاگ موفقیت
+        await storage.createTourLog({
+          level: "INFO",
+          message: `اسکرپ منبع "${source.name}" با موفقیت انجام شد`,
+          content: source.url
+        });
+        
+        res.json({ 
+          success: true, 
+          message: "اسکرپ با موفقیت انجام شد" 
+        });
+      } else {
+        // ثبت لاگ خطا
+        await storage.createTourLog({
+          level: "ERROR",
+          message: `خطا در اسکرپ منبع "${source.name}"`,
+          content: source.url
+        });
+        
+        res.status(500).json({ 
+          success: false, 
+          message: "خطا در اسکرپ منبع تور" 
+        });
+      }
     } catch (error) {
       next(error);
     }
