@@ -60,15 +60,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const request = await storage.createRequest(validation.data);
       
-      // If there's a telegram config, simulate sending to telegram
+      // اگر تلگرام فعال است، پیام درخواست جدید به کانال ارسال کن
       const telegramConfig = await storage.getTelegramConfig();
-      if (telegramConfig) {
-        await storage.createTelegramHistory({
-          requestId: request.id,
-          customerName: request.customerName,
-          requestType: request.requestType,
-          status: "sent"
-        });
+      if (telegramConfig && telegramConfig.isActive) {
+        try {
+          // آماده‌سازی متن پیام با استفاده از قالب ذخیره شده
+          let messageText = telegramConfig.messageFormat;
+          
+          if (!messageText) {
+            // اگر قالب پیام تنظیم نشده باشد، از یک قالب پیش‌فرض استفاده می‌کنیم
+            messageText = `🔔 درخواست جدید دریافت شد
+
+👤 مشتری: {customer_name}
+📱 شماره تماس: {phone_number}
+📝 نوع درخواست: {request_type}
+💰 مبلغ: {amount}
+
+📆 زمان ثبت: {submit_time}`;
+          }
+          
+          // تبدیل نوع درخواست به فارسی
+          let requestTypeText = request.requestType === 'refund' ? 'استرداد وجه' : 'پرداخت';
+          
+          // جایگزینی مقادیر پویا
+          messageText = messageText
+            .replace(/{customer_name}/g, request.customerName)
+            .replace(/{phone_number}/g, request.phoneNumber)
+            .replace(/{request_type}/g, requestTypeText)
+            .replace(/{amount}/g, 'نامشخص')
+            .replace(/{submit_time}/g, new Date().toLocaleString('fa-IR'));
+          
+          // ارسال پیام به کانال تلگرام
+          const result = await TelegramService.sendMessage(
+            messageText,
+            request.id,
+            request.customerName,
+            request.requestType
+          );
+          
+          // ثبت تاریخچه پیام تلگرام
+          await storage.createTelegramHistory({
+            requestId: request.id,
+            customerName: request.customerName,
+            requestType: request.requestType,
+            status: result.status ? "sent" : "failed"
+          });
+          
+          // ثبت لاگ سیستم
+          if (result.status) {
+            await storage.createSystemLog({
+              level: 'info',
+              message: `پیام درخواست جدید به کانال تلگرام ارسال شد`,
+              module: 'telegram-service',
+              details: { requestId: request.id, customer: request.customerName }
+            });
+          } else {
+            throw new Error(result.message);
+          }
+        } catch (telegramError) {
+          console.error('Error sending telegram message:', telegramError);
+          // در صورت خطا، لاگ ثبت کن ولی اجازه بده درخواست ادامه پیدا کند
+          await storage.createSystemLog({
+            level: 'error',
+            message: `خطا در ارسال پیام به تلگرام: ${telegramError instanceof Error ? telegramError.message : 'خطای ناشناخته'}`,
+            module: 'telegram-service',
+            details: { requestId: request.id }
+          });
+          
+          // ثبت در تاریخچه تلگرام با وضعیت خطا
+          await storage.createTelegramHistory({
+            requestId: request.id,
+            customerName: request.customerName,
+            requestType: request.requestType,
+            status: "failed"
+          });
+        }
       }
       
       res.status(201).json(request);
@@ -142,6 +208,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
             message: `خطا در ارسال پیامک وضعیت به شماره ${request.phoneNumber}`,
             module: 'sms-service',
             details: { error: smsError instanceof Error ? smsError.message : 'خطای ناشناخته', requestId: request.id }
+          });
+        }
+      }
+      
+      // ارسال اطلاعیه به کانال تلگرام در صورت تغییر وضعیت
+      const telegramConfig = await storage.getTelegramConfig();
+      if (telegramConfig && telegramConfig.isActive) {
+        try {
+          // متن وضعیت به فارسی
+          let statusText = 'نامشخص';
+          if (validation.data.status === 'approved') {
+            statusText = 'تایید شده ✅';
+          } else if (validation.data.status === 'rejected') {
+            statusText = 'رد شده ❌';
+          } else if (validation.data.status === 'pending') {
+            statusText = 'در حال بررسی 🔍';
+          }
+          
+          // تبدیل نوع درخواست به فارسی
+          let requestTypeText = request.requestType === 'refund' ? 'استرداد وجه' : 'پرداخت';
+          
+          // آماده‌سازی پیام تغییر وضعیت
+          const messageText = `🔔 بروزرسانی وضعیت درخواست
+
+👤 مشتری: ${request.customerName}
+📱 شماره موبایل: ${request.phoneNumber}
+📝 نوع درخواست: ${requestTypeText}
+💰 مبلغ: نامشخص
+📊 وضعیت جدید: ${statusText}
+
+📆 زمان تغییر وضعیت: ${new Date().toLocaleString('fa-IR')}`;
+          
+          // ارسال پیام به کانال تلگرام
+          const result = await TelegramService.sendMessage(
+            messageText,
+            request.id,
+            request.customerName,
+            request.requestType
+          );
+          
+          // ثبت لاگ سیستم
+          if (result.status) {
+            await storage.createSystemLog({
+              level: 'info',
+              message: `پیام تغییر وضعیت به کانال تلگرام ارسال شد`,
+              module: 'telegram-service',
+              details: { requestId: request.id, status: validation.data.status }
+            });
+          } else {
+            throw new Error(result.message);
+          }
+        } catch (telegramError) {
+          console.error('Error sending telegram status update message:', telegramError);
+          // در صورت خطا، لاگ ثبت می‌کنیم ولی ادامه می‌دهیم
+          await storage.createSystemLog({
+            level: 'error',
+            message: `خطا در ارسال پیام تغییر وضعیت به تلگرام: ${telegramError instanceof Error ? telegramError.message : 'خطای ناشناخته'}`,
+            module: 'telegram-service',
+            details: { requestId: request.id, status: validation.data.status }
           });
         }
       }
