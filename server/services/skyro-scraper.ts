@@ -7,6 +7,26 @@ import { TourData } from '@shared/schema';
  * اسکریپر مخصوص برای سایت skyrotrip.com
  */
 export class SkyroScraper {
+  /**
+   * تشخیص داخلی یا خارجی بودن تور بر اساس عنوان
+   * @param title عنوان تور
+   * @returns true اگر تور خارجی باشد
+   */
+  static isForeignTour(title: string): boolean {
+    // لیست کشورهای خارجی که معمولاً در تورها استفاده می‌شوند
+    const foreignDestinations = [
+      'دبی', 'استانبول', 'آنتالیا', 'کوش آداسی', 'ازمیر', 'کیش', 'ترکیه', 
+      'قطر', 'مالزی', 'تایلند', 'بالی', 'سنگاپور', 'گرجستان', 'باکو', 
+      'ارمنستان', 'ایروان', 'دهلی', 'بمبئی', 'روسیه', 'قبرس', 'وان',
+      'آذربایجان', 'چین', 'پکن', 'شانگهای', 'پاتایا', 'پوکت', 'کوالالامپور'
+    ];
+    
+    // بررسی وجود نام کشورهای خارجی در عنوان
+    const title_lower = title.trim().toLowerCase();
+    return foreignDestinations.some(destination => 
+      title_lower.includes(destination.toLowerCase())
+    );
+  }
   
   /**
    * استخراج اطلاعات تور از صفحه تور
@@ -16,6 +36,7 @@ export class SkyroScraper {
     success: boolean;
     message: string;
     data?: any;
+    isForeign?: boolean; // آیا تور خارجی است؟
   }> {
     try {
       // درخواست صفحه
@@ -34,6 +55,9 @@ export class SkyroScraper {
       
       // استخراج عنوان تور
       const title = $('.text-center > h1').text().trim();
+      
+      // تشخیص داخلی یا خارجی بودن تور بر اساس عنوان
+      const isForeign = this.isForeignTour(title);
       
       // استخراج توضیحات
       const description = $('.fade-in-text').text().trim();
@@ -125,7 +149,8 @@ export class SkyroScraper {
       return {
         success: true,
         message: 'اطلاعات تور با موفقیت استخراج شد',
-        data: tourData
+        data: tourData,
+        isForeign
       };
       
     } catch (error) {
@@ -245,9 +270,31 @@ export class SkyroScraper {
         };
       }
       
+      // بررسی نوع تور (داخلی یا خارجی)
+      // اگر کاربر منبع را مشخص کرده باشد، از آن استفاده می‌کنیم
+      // در غیر این صورت، از نتیجه تشخیص خودکار استفاده می‌کنیم
+      let finalSourceId = sourceId;
+      
+      // اگر کاربر منبع مشخصی را انتخاب نکرده و فقط از مقادیر پیش‌فرض استفاده کرده
+      if (sourceId === 1 || sourceId === 2) {
+        // اگر تشخیص دادیم که تور خارجی است
+        if (scrapeResult.isForeign) {
+          finalSourceId = 2; // تور خارجی
+        } else {
+          finalSourceId = 1; // تور داخلی
+        }
+      }
+      
+      // ثبت لاگ تشخیص
+      await storage.createTourLog({
+        level: 'INFO',
+        message: `تشخیص نوع تور: ${scrapeResult.isForeign ? 'خارجی' : 'داخلی'}`,
+        content: `عنوان: ${scrapeResult.data.title}, منبع: ${finalSourceId}`
+      });
+      
       // ایجاد تور جدید
       const newTour = await storage.createTourData({
-        sourceId,
+        sourceId: finalSourceId,
         title: scrapeResult.data.title,
         description: scrapeResult.data.description,
         price: scrapeResult.data.price,
