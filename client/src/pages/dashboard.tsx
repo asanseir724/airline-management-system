@@ -106,36 +106,7 @@ export default function Dashboard() {
         />
       </div>
 
-      <Card className="mb-8">
-        <CardHeader>
-          <CardTitle>آمار سیستم تورهای گردشگری</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <StatCard
-              title="مقاصد گردشگری فعال"
-              value={isLoadingDestinations ? "..." : activeDestinations.length.toString()}
-              icon={<Map className="h-5 w-5 text-indigo-500" />}
-              color="indigo-500"
-              onClick={() => handleTourView("/tour-destinations")}
-            />
-            <StatCard
-              title="برندهای تور فعال"
-              value={isLoadingBrands ? "..." : activeBrands.length.toString()}
-              icon={<Tag className="h-5 w-5 text-purple-500" />}
-              color="purple-500"
-              onClick={() => handleTourView("/tour-brands")}
-            />
-            <StatCard
-              title="درخواست‌های برند تور"
-              value={isLoadingBrandRequests ? "..." : pendingBrandRequests.length.toString()}
-              icon={<FileText className="h-5 w-5 text-pink-500" />}
-              color="pink-500"
-              onClick={() => handleTourView("/tour-brand-requests")}
-            />
-            <StatCard
-              title="مدیریت مقصدهای گردشگری"
-              value=""
+      
               icon={<Map className="h-5 w-5 text-cyan-500" />}
               color="cyan-500"
               onClick={() => handleTourView("/tour-destinations")}
