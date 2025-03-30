@@ -1,83 +1,97 @@
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DataTable } from "@/components/ui/data-table";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { TelegramHistory } from "@shared/schema";
-import { format } from "date-fns-jalali";
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from "@/components/ui/table";
+import { Loader2, MessageSquare } from "lucide-react";
+import { formatDate } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
 export function TelegramHistoryComponent() {
-  const { data: history = [], isLoading } = useQuery<TelegramHistory[]>({
+  const { data: history, isLoading, isError, error } = useQuery<TelegramHistory[]>({
     queryKey: ["/api/telegram-history"],
   });
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "sent":
-        return <Badge variant="outline" className="bg-green-100 text-green-800">ارسال شده</Badge>;
-      case "failed":
-        return <Badge variant="outline" className="bg-red-100 text-red-800">خطا در ارسال</Badge>;
-      default:
-        return null;
-    }
-  };
-  
-  const getRequestTypeText = (type: string) => {
-    return type === "refund" ? "استرداد بلیط" : "واریز وجه";
-  };
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-6 flex justify-center items-center">
+          <Loader2 className="w-6 h-6 animate-spin" />
+        </CardContent>
+      </Card>
+    );
+  }
 
-  const columns = [
-    {
-      header: "تاریخ و زمان",
-      accessorKey: "createdAt",
-      cell: (row: TelegramHistory) => format(new Date(row.createdAt), "yyyy/MM/dd HH:mm:ss"),
-    },
-    {
-      header: "نام مشتری",
-      accessorKey: "customerName",
-    },
-    {
-      header: "نوع درخواست",
-      accessorKey: "requestType",
-      cell: (row: TelegramHistory) => getRequestTypeText(row.requestType),
-    },
-    {
-      header: "وضعیت ارسال",
-      accessorKey: "status",
-      cell: (row: TelegramHistory) => getStatusBadge(row.status),
-    },
-  ];
+  if (isError) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-md">
+            <p>خطا در دریافت تاریخچه: {error instanceof Error ? error.message : 'خطای ناشناخته'}</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>تاریخچه ارسال‌ها</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <MessageSquare className="h-5 w-5 text-primary" />
+          تاریخچه پیام‌های ارسال شده به تلگرام
+        </CardTitle>
       </CardHeader>
       <CardContent>
-        <DataTable
-          columns={columns}
-          data={history}
-          loading={isLoading}
-          pagination={
-            <div className="flex items-center justify-between mt-6">
-              <div className="text-sm text-gray-500">
-                نمایش {history.length > 0 ? "۱" : "۰"}-{history.length} از {history.length} مورد
-              </div>
-              <div className="flex space-x-2 space-x-reverse">
-                <Button size="sm" variant="outline" className="px-3 py-1" disabled>
-                  قبلی
-                </Button>
-                <Button size="sm" className="px-3 py-1">
-                  ۱
-                </Button>
-                <Button size="sm" variant="outline" className="px-3 py-1" disabled={history.length <= 10}>
-                  بعدی
-                </Button>
-              </div>
-            </div>
-          }
-        />
+        {(!history || history.length === 0) ? (
+          <div className="bg-gray-50 border border-gray-200 text-gray-700 p-4 rounded-md text-center">
+            <p>هیچ پیامی در تاریخچه ثبت نشده است.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>#</TableHead>
+                  <TableHead>نام مشتری</TableHead>
+                  <TableHead>نوع درخواست</TableHead>
+                  <TableHead>وضعیت</TableHead>
+                  <TableHead>تاریخ ارسال</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {history.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell className="font-medium">{item.id}</TableCell>
+                    <TableCell>{item.customerName || '-'}</TableCell>
+                    <TableCell>
+                      {item.requestType === 'refund' && 'استرداد وجه'}
+                      {item.requestType === 'payment' && 'پرداخت'}
+                      {item.requestType === 'status_update' && 'به‌روزرسانی وضعیت'}
+                      {item.requestType === 'custom' && 'پیام دستی'}
+                      {!['refund', 'payment', 'status_update', 'custom'].includes(item.requestType || '') && item.requestType}
+                    </TableCell>
+                    <TableCell>
+                      {item.status === 'sent' ? (
+                        <Badge className="bg-green-500">ارسال شده</Badge>
+                      ) : (
+                        <Badge variant="destructive">ناموفق</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>{formatDate(item.createdAt)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

@@ -2,6 +2,7 @@ import React from "react";
 import { AirlineLayout } from "@/components/airline-layout";
 import { TelegramConfiguration } from "@/components/telegram/telegram-config";
 import { TelegramHistoryComponent } from "@/components/telegram/telegram-history";
+import { TelegramSender } from "@/components/telegram/telegram-sender";
 
 export default function TelegramIntegration() {
   return (
@@ -11,6 +12,7 @@ export default function TelegramIntegration() {
     >
       <div className="space-y-6">
         <TelegramConfiguration />
+        <TelegramSender />
         <TelegramHistoryComponent />
       </div>
     </AirlineLayout>

@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { SmsService } from "./services/sms";
+import { TelegramService } from "./services/telegram";
 import { 
   insertRequestSchema, 
   insertSmsTemplateSchema, 
@@ -278,6 +279,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // API برای ارسال پیام به تلگرام
+  app.post("/api/telegram/send", isAuthenticated, async (req, res, next) => {
+    try {
+      const telegramSchema = z.object({
+        message: z.string().min(1),
+        requestId: z.number().nullable().optional(),
+        customerName: z.string().optional(),
+        requestType: z.string().optional(),
+      });
+      
+      const validation = telegramSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "اطلاعات پیام تلگرام معتبر نیست", 
+          errors: validation.error.errors 
+        });
+      }
+      
+      const { message, requestId, customerName, requestType } = validation.data;
+      const result = await TelegramService.sendMessage(
+        message, 
+        requestId || undefined,
+        customerName || '',
+        requestType || ''
+      );
+      
+      if (result.status) {
+        res.status(200).json({
+          success: true,
+          message: result.message,
+          messageId: result.messageId
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          message: result.message
+        });
+      }
+    } catch (error) {
+      console.error('Error in sending Telegram message:', error);
+      next(error);
+    }
+  });
+
   // Telegram History routes
   app.get("/api/telegram-history", isAuthenticated, async (req, res, next) => {
     try {
@@ -407,15 +452,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const request = await storage.createCustomerRequest(requestData);
       
-      // If there's a telegram config, simulate sending to telegram
+      // اگر تلگرام فعال است، پیام درخواست جدید به کانال ارسال کن
       const telegramConfig = await storage.getTelegramConfig();
       if (telegramConfig && telegramConfig.isActive) {
-        await storage.createTelegramHistory({
-          requestId: request.id,
-          customerName: request.accountOwner, // Using account owner name as customer name
-          requestType: "refund",
-          status: "sent"
-        });
+        try {
+          // آماده‌سازی متن پیام با استفاده از قالب ذخیره شده
+          let messageText = telegramConfig.messageFormat;
+          
+          // جایگزینی مقادیر پویا
+          messageText = messageText
+            .replace(/{customer_name}/g, request.accountOwner)
+            .replace(/{phone_number}/g, request.phoneNumber)
+            .replace(/{ticket_number}/g, request.voucherNumber)
+            .replace(/{tracking_code}/g, request.trackingCode)
+            .replace(/{request_type}/g, 'استرداد وجه')
+            .replace(/{description}/g, request.description || 'بدون توضیحات');
+          
+          // ارسال پیام به کانال تلگرام
+          const result = await TelegramService.sendMessage(
+            messageText,
+            request.id,
+            request.accountOwner,
+            'refund'
+          );
+          
+          // ثبت لاگ سیستم
+          if (result.status) {
+            await storage.createSystemLog({
+              level: 'info',
+              message: `پیام درخواست جدید به کانال تلگرام ارسال شد`,
+              module: 'telegram-service',
+              details: { requestId: request.id, customer: request.accountOwner }
+            });
+          } else {
+            throw new Error(result.message);
+          }
+        } catch (telegramError) {
+          console.error('Error sending telegram message:', telegramError);
+          // در صورت خطا، لاگ ثبت کن ولی اجازه بده درخواست ادامه پیدا کند
+          await storage.createSystemLog({
+            level: 'error',
+            message: `خطا در ارسال پیام به تلگرام: ${telegramError instanceof Error ? telegramError.message : 'خطای ناشناخته'}`,
+            module: 'telegram-service',
+            details: { requestId: request.id }
+          });
+          
+          // ثبت در تاریخچه تلگرام با وضعیت خطا
+          await storage.createTelegramHistory({
+            requestId: request.id,
+            customerName: request.accountOwner,
+            requestType: "refund",
+            status: "failed"
+          });
+        }
       }
       
       // ارسال پیامک تاییدیه
@@ -529,6 +618,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
             message: `خطا در ارسال پیامک وضعیت به شماره ${request.phoneNumber}`,
             module: 'sms-service',
             details: { error: smsError instanceof Error ? smsError.message : 'خطای ناشناخته', requestId: request.id }
+          });
+        }
+      }
+      
+      // ارسال اطلاعیه به کانال تلگرام در صورت تغییر وضعیت
+      const telegramConfig = await storage.getTelegramConfig();
+      if (telegramConfig && telegramConfig.isActive) {
+        try {
+          // متن وضعیت به فارسی
+          let statusText = 'نامشخص';
+          if (validation.data.status === 'approved') {
+            statusText = 'تایید شده ✅';
+          } else if (validation.data.status === 'rejected') {
+            statusText = 'رد شده ❌';
+          } else if (validation.data.status === 'pending') {
+            statusText = 'در حال بررسی 🔍';
+          }
+          
+          // آماده‌سازی پیام تغییر وضعیت
+          const messageText = `🔔 بروزرسانی وضعیت درخواست
+
+🎫 شماره واچر: ${request.voucherNumber}
+🔢 کد پیگیری: ${request.trackingCode}
+👤 مشتری: ${request.accountOwner}
+📱 شماره موبایل: ${request.phoneNumber}
+📊 وضعیت جدید: ${statusText}
+
+📆 زمان تغییر وضعیت: ${new Date().toLocaleString('fa-IR')}`;
+          
+          // ارسال پیام به کانال تلگرام
+          const result = await TelegramService.sendMessage(
+            messageText,
+            request.id,
+            request.accountOwner,
+            'status_update'
+          );
+          
+          // ثبت لاگ سیستم
+          if (result.status) {
+            await storage.createSystemLog({
+              level: 'info',
+              message: `پیام تغییر وضعیت به کانال تلگرام ارسال شد`,
+              module: 'telegram-service',
+              details: { requestId: request.id, status: validation.data.status }
+            });
+          } else {
+            throw new Error(result.message);
+          }
+        } catch (telegramError) {
+          console.error('Error sending telegram status update message:', telegramError);
+          // در صورت خطا، لاگ ثبت می‌کنیم ولی ادامه می‌دهیم
+          await storage.createSystemLog({
+            level: 'error',
+            message: `خطا در ارسال پیام تغییر وضعیت به تلگرام: ${telegramError instanceof Error ? telegramError.message : 'خطای ناشناخته'}`,
+            module: 'telegram-service',
+            details: { requestId: request.id, status: validation.data.status }
           });
         }
       }

@@ -20,7 +20,7 @@ export function TelegramConfiguration() {
   
   const [formData, setFormData] = useState<Partial<TelegramConfig>>({
     botToken: "",
-    channelId: "@airlinerequeststest",
+    channelId: "-1001234567890", // آیدی عددی کانال خصوصی
     messageFormat: `✈️ درخواست جدید
                          
 👤 نام مشتری: {customer_name}
@@ -139,14 +139,18 @@ export function TelegramConfiguration() {
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  آیدی کانال
+                  آیدی عددی کانال
                 </label>
                 <Input
                   type="text"
                   name="channelId"
                   value={formData.channelId}
                   onChange={handleInputChange}
+                  placeholder="-1001234567890"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  برای کانال‌های خصوصی باید از آیدی عددی استفاده کنید. مثال: -1001234567890
+                </p>
               </div>
             </div>
             
