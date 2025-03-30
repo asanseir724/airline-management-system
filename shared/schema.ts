@@ -248,3 +248,125 @@ export const insertCustomerRequestSchema = createInsertSchema(customerRequests).
 
 export type CustomerRequest = typeof customerRequests.$inferSelect;
 export type InsertCustomerRequest = z.infer<typeof insertCustomerRequestSchema>;
+
+// ================= تورهای گردشگری =================
+
+// مقصدهای گردشگری
+export const tourDestinations = pgTable("tour_destinations", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertTourDestinationSchema = createInsertSchema(tourDestinations).pick({
+  name: true,
+  active: true,
+});
+
+// برندهای همکار
+export const tourBrands = pgTable("tour_brands", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  type: text("type").notNull(), // آژانس یا برند
+  telegramChannel: text("telegram_channel"),
+  description: text("description"),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertTourBrandSchema = createInsertSchema(tourBrands).pick({
+  name: true,
+  type: true,
+  telegramChannel: true,
+  description: true,
+  active: true,
+});
+
+// درخواست‌های همکاری برند
+export const tourBrandRequests = pgTable("tour_brand_requests", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  type: text("type").notNull(), // آژانس یا برند
+  telegramChannel: text("telegram_channel"),
+  description: text("description"),
+  contactInfo: text("contact_info").notNull(),
+  status: text("status").default("pending").notNull(), // pending, approved, rejected
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertTourBrandRequestSchema = createInsertSchema(tourBrandRequests).pick({
+  name: true,
+  type: true,
+  telegramChannel: true,
+  description: true,
+  contactInfo: true,
+});
+
+// تنظیمات تورهای گردشگری
+export const tourSettings = pgTable("tour_settings", {
+  id: serial("id").primaryKey(),
+  avalaiApiKey: text("avalai_api_key").notNull(),
+  telegramToken: text("telegram_token").notNull(),
+  telegramChannels: text("telegram_channels").notNull(),
+  timezone: text("timezone").default("Asia/Tehran").notNull(),
+  intervalHours: integer("interval_hours").default(24).notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertTourSettingsSchema = createInsertSchema(tourSettings).pick({
+  avalaiApiKey: true,
+  telegramToken: true,
+  telegramChannels: true,
+  timezone: true,
+  intervalHours: true,
+});
+
+// تاریخچه تورهای تولید شده
+export const tourHistory = pgTable("tour_history", {
+  id: serial("id").primaryKey(),
+  destinationName: text("destination_name").notNull(),
+  content: text("content").notNull(),
+  status: text("status").default("sent").notNull(), // sent, failed
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertTourHistorySchema = createInsertSchema(tourHistory).pick({
+  destinationName: true,
+  content: true,
+  status: true,
+});
+
+// لاگ‌های مربوط به تور
+export const tourLogs = pgTable("tour_logs", {
+  id: serial("id").primaryKey(),
+  level: text("level").notNull(), // INFO, ERROR, WARNING
+  message: text("message").notNull(),
+  content: text("content"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertTourLogSchema = createInsertSchema(tourLogs).pick({
+  level: true,
+  message: true,
+  content: true,
+});
+
+// Type definitions for tours
+export type TourDestination = typeof tourDestinations.$inferSelect;
+export type InsertTourDestination = z.infer<typeof insertTourDestinationSchema>;
+
+export type TourBrand = typeof tourBrands.$inferSelect;
+export type InsertTourBrand = z.infer<typeof insertTourBrandSchema>;
+
+export type TourBrandRequest = typeof tourBrandRequests.$inferSelect;
+export type InsertTourBrandRequest = z.infer<typeof insertTourBrandRequestSchema>;
+
+export type TourSetting = typeof tourSettings.$inferSelect;
+export type InsertTourSetting = z.infer<typeof insertTourSettingsSchema>;
+
+export type TourHistory = typeof tourHistory.$inferSelect;
+export type InsertTourHistory = z.infer<typeof insertTourHistorySchema>;
+
+export type TourLog = typeof tourLogs.$inferSelect;
+export type InsertTourLog = z.infer<typeof insertTourLogSchema>;

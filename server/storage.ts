@@ -9,7 +9,14 @@ import {
   backupHistory, type BackupHistory, type InsertBackupHistory,
   backupSettings, type BackupSettings, type InsertBackupSettings,
   customerRequests, type CustomerRequest, type InsertCustomerRequest,
-  systemLogs, type SystemLog, type InsertSystemLog
+  systemLogs, type SystemLog, type InsertSystemLog,
+  // Tour related imports
+  tourDestinations, type TourDestination, type InsertTourDestination,
+  tourBrands, type TourBrand, type InsertTourBrand,
+  tourBrandRequests, type TourBrandRequest, type InsertTourBrandRequest,
+  tourSettings, type TourSetting, type InsertTourSetting,
+  tourHistory, type TourHistory, type InsertTourHistory,
+  tourLogs, type TourLog, type InsertTourLog
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
@@ -84,6 +91,40 @@ export interface IStorage {
   createSystemLog(log: InsertSystemLog): Promise<SystemLog>;
   deleteSystemLog(id: number): Promise<boolean>;
   clearSystemLogs(): Promise<boolean>;
+  
+  // Tour Destination methods
+  getTourDestinations(): Promise<TourDestination[]>;
+  getTourDestinationById(id: number): Promise<TourDestination | undefined>;
+  createTourDestination(destination: InsertTourDestination): Promise<TourDestination>;
+  updateTourDestination(id: number, destination: Partial<InsertTourDestination>): Promise<TourDestination | undefined>;
+  deleteTourDestination(id: number): Promise<boolean>;
+  
+  // Tour Brand methods
+  getTourBrands(): Promise<TourBrand[]>;
+  getTourBrandById(id: number): Promise<TourBrand | undefined>;
+  createTourBrand(brand: InsertTourBrand): Promise<TourBrand>;
+  updateTourBrand(id: number, brand: Partial<InsertTourBrand>): Promise<TourBrand | undefined>;
+  deleteTourBrand(id: number): Promise<boolean>;
+  
+  // Tour Brand Request methods
+  getTourBrandRequests(): Promise<TourBrandRequest[]>;
+  getTourBrandRequestById(id: number): Promise<TourBrandRequest | undefined>;
+  createTourBrandRequest(request: InsertTourBrandRequest): Promise<TourBrandRequest>;
+  updateTourBrandRequestStatus(id: number, status: string): Promise<TourBrandRequest | undefined>;
+  
+  // Tour Settings methods
+  getTourSettings(): Promise<TourSetting | undefined>;
+  createTourSettings(settings: InsertTourSetting): Promise<TourSetting>;
+  updateTourSettings(id: number, settings: Partial<InsertTourSetting>): Promise<TourSetting | undefined>;
+  
+  // Tour History methods
+  getTourHistory(): Promise<TourHistory[]>;
+  createTourHistory(history: InsertTourHistory): Promise<TourHistory>;
+  
+  // Tour Log methods
+  getTourLogs(): Promise<TourLog[]>;
+  createTourLog(log: InsertTourLog): Promise<TourLog>;
+  clearTourLogs(): Promise<boolean>;
   
   // Session store
   sessionStore: any;
@@ -160,6 +201,30 @@ export class DatabaseStorage implements IStorage {
 توضیحات: {description}`,
           isActive: true
         });
+      }
+      
+      // Add default tour settings if needed
+      const tourSettings = await this.getTourSettings();
+      if (!tourSettings) {
+        await this.createTourSettings({
+          avalaiApiKey: "aa-Sqsb4xUwWTDcjijQbiA9lcinKmBv8JfLevU86YtfuFPM6bZ9",
+          telegramToken: "",
+          telegramChannels: "@skyro_travel",
+          timezone: "Asia/Tehran",
+          intervalHours: 24
+        });
+      }
+      
+      // Add default tour destinations if needed
+      const tourDestinations = await this.getTourDestinations();
+      if (tourDestinations.length === 0) {
+        const defaultDestinations = [
+          "مشهد", "کیش", "استانبول", "دبی", "آنتالیا", "پاتایا", "پوکت", "باکو", "تفلیس", "کوالالامپور"
+        ];
+        
+        for (const name of defaultDestinations) {
+          await this.createTourDestination({ name, active: true });
+        }
       }
       
       console.log("Database initialized successfully");
@@ -481,6 +546,182 @@ export class DatabaseStorage implements IStorage {
       return true;
     } catch (error) {
       console.error("Error clearing system logs:", error);
+      return false;
+    }
+  }
+
+  // Tour Destination methods
+  async getTourDestinations(): Promise<TourDestination[]> {
+    return await this.db.select().from(schema.tourDestinations);
+  }
+  
+  async getTourDestinationById(id: number): Promise<TourDestination | undefined> {
+    const result = await this.db.select().from(schema.tourDestinations).where(eq(schema.tourDestinations.id, id)).limit(1);
+    return result[0];
+  }
+  
+  async createTourDestination(destination: InsertTourDestination): Promise<TourDestination> {
+    const result = await this.db.insert(schema.tourDestinations).values({
+      name: destination.name,
+      active: destination.active !== undefined ? destination.active : true
+    }).returning();
+    
+    return result[0];
+  }
+  
+  async updateTourDestination(id: number, destination: Partial<InsertTourDestination>): Promise<TourDestination | undefined> {
+    const result = await this.db.update(schema.tourDestinations)
+      .set(destination)
+      .where(eq(schema.tourDestinations.id, id))
+      .returning();
+    
+    return result[0];
+  }
+  
+  async deleteTourDestination(id: number): Promise<boolean> {
+    const result = await this.db.delete(schema.tourDestinations)
+      .where(eq(schema.tourDestinations.id, id));
+    
+    return !!result;
+  }
+  
+  // Tour Brand methods
+  async getTourBrands(): Promise<TourBrand[]> {
+    return await this.db.select().from(schema.tourBrands);
+  }
+  
+  async getTourBrandById(id: number): Promise<TourBrand | undefined> {
+    const result = await this.db.select().from(schema.tourBrands).where(eq(schema.tourBrands.id, id)).limit(1);
+    return result[0];
+  }
+  
+  async createTourBrand(brand: InsertTourBrand): Promise<TourBrand> {
+    const result = await this.db.insert(schema.tourBrands).values({
+      name: brand.name,
+      type: brand.type,
+      telegramChannel: brand.telegramChannel || null,
+      description: brand.description || null,
+      active: brand.active !== undefined ? brand.active : true
+    }).returning();
+    
+    return result[0];
+  }
+  
+  async updateTourBrand(id: number, brand: Partial<InsertTourBrand>): Promise<TourBrand | undefined> {
+    const result = await this.db.update(schema.tourBrands)
+      .set(brand)
+      .where(eq(schema.tourBrands.id, id))
+      .returning();
+    
+    return result[0];
+  }
+  
+  async deleteTourBrand(id: number): Promise<boolean> {
+    const result = await this.db.delete(schema.tourBrands)
+      .where(eq(schema.tourBrands.id, id));
+    
+    return !!result;
+  }
+  
+  // Tour Brand Request methods
+  async getTourBrandRequests(): Promise<TourBrandRequest[]> {
+    return await this.db.select().from(schema.tourBrandRequests).orderBy(desc(schema.tourBrandRequests.createdAt));
+  }
+  
+  async getTourBrandRequestById(id: number): Promise<TourBrandRequest | undefined> {
+    const result = await this.db.select().from(schema.tourBrandRequests).where(eq(schema.tourBrandRequests.id, id)).limit(1);
+    return result[0];
+  }
+  
+  async createTourBrandRequest(request: InsertTourBrandRequest): Promise<TourBrandRequest> {
+    const result = await this.db.insert(schema.tourBrandRequests).values({
+      name: request.name,
+      type: request.type,
+      telegramChannel: request.telegramChannel || null,
+      description: request.description || null,
+      contactInfo: request.contactInfo
+    }).returning();
+    
+    return result[0];
+  }
+  
+  async updateTourBrandRequestStatus(id: number, status: string): Promise<TourBrandRequest | undefined> {
+    const result = await this.db.update(schema.tourBrandRequests)
+      .set({ status })
+      .where(eq(schema.tourBrandRequests.id, id))
+      .returning();
+    
+    return result[0];
+  }
+  
+  // Tour Settings methods
+  async getTourSettings(): Promise<TourSetting | undefined> {
+    const result = await this.db.select().from(schema.tourSettings).limit(1);
+    return result[0];
+  }
+  
+  async createTourSettings(settings: InsertTourSetting): Promise<TourSetting> {
+    const result = await this.db.insert(schema.tourSettings).values({
+      avalaiApiKey: settings.avalaiApiKey,
+      telegramToken: settings.telegramToken,
+      telegramChannels: settings.telegramChannels,
+      timezone: settings.timezone || "Asia/Tehran",
+      intervalHours: settings.intervalHours || 24
+    }).returning();
+    
+    return result[0];
+  }
+  
+  async updateTourSettings(id: number, settings: Partial<InsertTourSetting>): Promise<TourSetting | undefined> {
+    const updateData: any = { ...settings };
+    if (Object.keys(settings).length > 0) {
+      updateData.updatedAt = new Date();
+    }
+    
+    const result = await this.db.update(schema.tourSettings)
+      .set(updateData)
+      .where(eq(schema.tourSettings.id, id))
+      .returning();
+    
+    return result[0];
+  }
+  
+  // Tour History methods
+  async getTourHistory(): Promise<TourHistory[]> {
+    return await this.db.select().from(schema.tourHistory).orderBy(desc(schema.tourHistory.createdAt));
+  }
+  
+  async createTourHistory(history: InsertTourHistory): Promise<TourHistory> {
+    const result = await this.db.insert(schema.tourHistory).values({
+      destinationName: history.destinationName,
+      content: history.content,
+      status: history.status || "sent"
+    }).returning();
+    
+    return result[0];
+  }
+  
+  // Tour Log methods
+  async getTourLogs(): Promise<TourLog[]> {
+    return await this.db.select().from(schema.tourLogs).orderBy(desc(schema.tourLogs.createdAt));
+  }
+  
+  async createTourLog(log: InsertTourLog): Promise<TourLog> {
+    const result = await this.db.insert(schema.tourLogs).values({
+      level: log.level,
+      message: log.message,
+      content: log.content || null
+    }).returning();
+    
+    return result[0];
+  }
+  
+  async clearTourLogs(): Promise<boolean> {
+    try {
+      await this.db.delete(schema.tourLogs);
+      return true;
+    } catch (error) {
+      console.error("Error clearing tour logs:", error);
       return false;
     }
   }

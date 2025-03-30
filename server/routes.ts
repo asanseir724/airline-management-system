@@ -16,7 +16,13 @@ import {
   insertBackupSettingsSchema,
   insertCustomerRequestSchema,
   insertSystemLogSchema,
-  insertSmsSettingsSchema
+  insertSmsSettingsSchema,
+  insertTourDestinationSchema,
+  insertTourBrandSchema,
+  insertTourBrandRequestSchema,
+  insertTourSettingsSchema,
+  insertTourHistorySchema,
+  insertTourLogSchema
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -1074,6 +1080,476 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: `زمان‌بندی بک‌آپ با موفقیت ${active ? 'فعال' : 'غیرفعال'} شد`,
         settings: updatedSettings 
       });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Tour Destinations routes
+  app.get("/api/tour-destinations", isAuthenticated, async (req, res, next) => {
+    try {
+      const destinations = await storage.getTourDestinations();
+      res.json(destinations);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.get("/api/tour-destinations/:id", isAuthenticated, async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id);
+      const destination = await storage.getTourDestinationById(id);
+      if (!destination) {
+        return res.status(404).json({ message: "مقصد گردشگری یافت نشد" });
+      }
+      res.json(destination);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.post("/api/tour-destinations", isAuthenticated, async (req, res, next) => {
+    try {
+      const validation = insertTourDestinationSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "اطلاعات مقصد گردشگری معتبر نیست", 
+          errors: validation.error.errors 
+        });
+      }
+      
+      const destination = await storage.createTourDestination(validation.data);
+      
+      // Log creation
+      await storage.createSystemLog({
+        level: 'info',
+        message: `مقصد گردشگری جدید ایجاد شد: ${destination.name}`,
+        module: 'tour-management',
+        details: { destinationId: destination.id }
+      });
+      
+      res.status(201).json(destination);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.patch("/api/tour-destinations/:id", isAuthenticated, async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      // Validate the update data
+      const updateSchema = z.object({
+        name: z.string().optional(),
+        active: z.boolean().optional()
+      });
+      
+      const validation = updateSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "اطلاعات بروزرسانی معتبر نیست", 
+          errors: validation.error.errors 
+        });
+      }
+      
+      const destination = await storage.updateTourDestination(id, validation.data);
+      if (!destination) {
+        return res.status(404).json({ message: "مقصد گردشگری یافت نشد" });
+      }
+      
+      // Log update
+      await storage.createSystemLog({
+        level: 'info',
+        message: `مقصد گردشگری بروزرسانی شد: ${destination.name}`,
+        module: 'tour-management',
+        details: { 
+          destinationId: destination.id,
+          changes: validation.data
+        }
+      });
+      
+      res.json(destination);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.delete("/api/tour-destinations/:id", isAuthenticated, async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      // First, get the destination to log its name
+      const destination = await storage.getTourDestinationById(id);
+      if (!destination) {
+        return res.status(404).json({ message: "مقصد گردشگری یافت نشد" });
+      }
+      
+      const success = await storage.deleteTourDestination(id);
+      if (!success) {
+        return res.status(404).json({ message: "مقصد گردشگری یافت نشد" });
+      }
+      
+      // Log deletion
+      await storage.createSystemLog({
+        level: 'warning',
+        message: `مقصد گردشگری حذف شد: ${destination.name}`,
+        module: 'tour-management',
+        details: { destinationId: id }
+      });
+      
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  // Tour Brands routes
+  app.get("/api/tour-brands", isAuthenticated, async (req, res, next) => {
+    try {
+      const brands = await storage.getTourBrands();
+      res.json(brands);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.get("/api/tour-brands/:id", isAuthenticated, async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id);
+      const brand = await storage.getTourBrandById(id);
+      if (!brand) {
+        return res.status(404).json({ message: "برند تور یافت نشد" });
+      }
+      res.json(brand);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.post("/api/tour-brands", isAuthenticated, async (req, res, next) => {
+    try {
+      const validation = insertTourBrandSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "اطلاعات برند تور معتبر نیست", 
+          errors: validation.error.errors 
+        });
+      }
+      
+      const brand = await storage.createTourBrand(validation.data);
+      
+      // Log creation
+      await storage.createSystemLog({
+        level: 'info',
+        message: `برند تور جدید ایجاد شد: ${brand.name}`,
+        module: 'tour-management',
+        details: { brandId: brand.id, type: brand.type }
+      });
+      
+      res.status(201).json(brand);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.patch("/api/tour-brands/:id", isAuthenticated, async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      // Validate the update data
+      const updateSchema = z.object({
+        name: z.string().optional(),
+        type: z.string().optional(),
+        telegramChannel: z.string().nullable().optional(),
+        description: z.string().nullable().optional(),
+        active: z.boolean().optional()
+      });
+      
+      const validation = updateSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "اطلاعات بروزرسانی معتبر نیست", 
+          errors: validation.error.errors 
+        });
+      }
+      
+      const brand = await storage.updateTourBrand(id, validation.data);
+      if (!brand) {
+        return res.status(404).json({ message: "برند تور یافت نشد" });
+      }
+      
+      // Log update
+      await storage.createSystemLog({
+        level: 'info',
+        message: `برند تور بروزرسانی شد: ${brand.name}`,
+        module: 'tour-management',
+        details: { 
+          brandId: brand.id,
+          changes: validation.data
+        }
+      });
+      
+      res.json(brand);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.delete("/api/tour-brands/:id", isAuthenticated, async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      // First, get the brand to log its name
+      const brand = await storage.getTourBrandById(id);
+      if (!brand) {
+        return res.status(404).json({ message: "برند تور یافت نشد" });
+      }
+      
+      const success = await storage.deleteTourBrand(id);
+      if (!success) {
+        return res.status(404).json({ message: "برند تور یافت نشد" });
+      }
+      
+      // Log deletion
+      await storage.createSystemLog({
+        level: 'warning',
+        message: `برند تور حذف شد: ${brand.name}`,
+        module: 'tour-management',
+        details: { brandId: id }
+      });
+      
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  // Tour Brand Requests routes
+  app.get("/api/tour-brand-requests", isAuthenticated, async (req, res, next) => {
+    try {
+      const brandRequests = await storage.getTourBrandRequests();
+      res.json(brandRequests);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.get("/api/tour-brand-requests/:id", isAuthenticated, async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id);
+      const brandRequest = await storage.getTourBrandRequestById(id);
+      if (!brandRequest) {
+        return res.status(404).json({ message: "درخواست برند تور یافت نشد" });
+      }
+      res.json(brandRequest);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.post("/api/tour-brand-requests", async (req, res, next) => {
+    try {
+      const validation = insertTourBrandRequestSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "اطلاعات درخواست برند تور معتبر نیست", 
+          errors: validation.error.errors 
+        });
+      }
+      
+      const brandRequest = await storage.createTourBrandRequest(validation.data);
+      
+      // Log creation
+      await storage.createSystemLog({
+        level: 'info',
+        message: `درخواست برند تور جدید ثبت شد: ${brandRequest.name}`,
+        module: 'tour-management',
+        details: { requestId: brandRequest.id, type: brandRequest.type }
+      });
+      
+      res.status(201).json(brandRequest);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.patch("/api/tour-brand-requests/:id/status", isAuthenticated, async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      // Validate the status update
+      const statusSchema = z.object({
+        status: z.enum(["pending", "approved", "rejected"])
+      });
+      
+      const validation = statusSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "وضعیت درخواست معتبر نیست", 
+          errors: validation.error.errors 
+        });
+      }
+      
+      const brandRequest = await storage.updateTourBrandRequestStatus(id, validation.data.status);
+      if (!brandRequest) {
+        return res.status(404).json({ message: "درخواست برند تور یافت نشد" });
+      }
+      
+      // اگر درخواست تأیید شده، برند تور جدید ایجاد کنیم
+      if (validation.data.status === "approved") {
+        try {
+          const newBrand = await storage.createTourBrand({
+            name: brandRequest.name,
+            type: brandRequest.type,
+            telegramChannel: brandRequest.telegramChannel,
+            description: brandRequest.description,
+            active: true
+          });
+          
+          // Log the brand creation
+          await storage.createSystemLog({
+            level: 'info',
+            message: `برند تور جدید از درخواست تأیید شده ایجاد شد: ${newBrand.name}`,
+            module: 'tour-management',
+            details: { 
+              brandId: newBrand.id, 
+              requestId: brandRequest.id 
+            }
+          });
+        } catch (createError) {
+          console.error('خطا در ایجاد برند تور از درخواست تأیید شده:', createError);
+          await storage.createSystemLog({
+            level: 'error',
+            message: `خطا در ایجاد برند تور از درخواست تأیید شده: ${brandRequest.name}`,
+            module: 'tour-management',
+            details: { 
+              error: createError instanceof Error ? createError.message : 'خطای ناشناخته',
+              requestId: brandRequest.id 
+            }
+          });
+        }
+      }
+      
+      // Log status update
+      await storage.createSystemLog({
+        level: 'info',
+        message: `وضعیت درخواست برند تور به "${validation.data.status}" تغییر یافت: ${brandRequest.name}`,
+        module: 'tour-management',
+        details: { requestId: brandRequest.id }
+      });
+      
+      res.json(brandRequest);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  // Tour Settings routes
+  app.get("/api/tour-settings", isAuthenticated, async (req, res, next) => {
+    try {
+      const settings = await storage.getTourSettings();
+      if (!settings) {
+        return res.status(404).json({ message: "تنظیمات تور یافت نشد" });
+      }
+      res.json(settings);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.patch("/api/tour-settings/:id", isAuthenticated, async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      // Validate the update data
+      const updateSchema = z.object({
+        avalaiApiKey: z.string().optional(),
+        telegramToken: z.string().optional(),
+        telegramChannels: z.string().optional(),
+        timezone: z.string().optional(),
+        intervalHours: z.number().optional()
+      });
+      
+      const validation = updateSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "اطلاعات بروزرسانی معتبر نیست", 
+          errors: validation.error.errors 
+        });
+      }
+      
+      const settings = await storage.updateTourSettings(id, validation.data);
+      if (!settings) {
+        return res.status(404).json({ message: "تنظیمات تور یافت نشد" });
+      }
+      
+      // Log update
+      await storage.createSystemLog({
+        level: 'info',
+        message: `تنظیمات تور بروزرسانی شد`,
+        module: 'tour-management',
+        details: { 
+          settingsId: settings.id,
+          changes: Object.keys(validation.data)
+        }
+      });
+      
+      res.json(settings);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  // Tour History routes
+  app.get("/api/tour-history", isAuthenticated, async (req, res, next) => {
+    try {
+      const history = await storage.getTourHistory();
+      res.json(history);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  // Tour Logs routes
+  app.get("/api/tour-logs", isAuthenticated, async (req, res, next) => {
+    try {
+      const logs = await storage.getTourLogs();
+      res.json(logs);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.post("/api/tour-logs", isAuthenticated, async (req, res, next) => {
+    try {
+      const validation = insertTourLogSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "اطلاعات لاگ تور معتبر نیست", 
+          errors: validation.error.errors 
+        });
+      }
+      
+      const log = await storage.createTourLog(validation.data);
+      res.status(201).json(log);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.delete("/api/tour-logs/clear", isAuthenticated, async (req, res, next) => {
+    try {
+      const success = await storage.clearTourLogs();
+      if (success) {
+        await storage.createSystemLog({
+          level: 'warning',
+          message: `تمام لاگ‌های تور پاک شدند`,
+          module: 'tour-management'
+        });
+        res.status(200).json({ message: "لاگ‌های تور با موفقیت پاک شدند" });
+      } else {
+        res.status(500).json({ message: "خطا در پاک کردن لاگ‌های تور" });
+      }
     } catch (error) {
       next(error);
     }
