@@ -3,12 +3,16 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { BackupHistory } from "@shared/schema";
+import { BackupHistory, BackupSettings } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { Database } from "lucide-react";
 
 export function BackupStatus() {
   const { toast } = useToast();
+  
+  const { data: backupSettings } = useQuery<BackupSettings>({
+    queryKey: ["/api/backup-settings"],
+  });
   
   const { data: backupHistory = [], isLoading } = useQuery<BackupHistory[]>({
     queryKey: ["/api/backup-history"],
@@ -54,12 +58,14 @@ export function BackupStatus() {
     <Card>
       <CardContent className="p-6">
         <div className="flex items-center mb-4">
-          <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center ml-4">
-            <Database className="h-5 w-5 text-green-600" />
+          <div className={`h-12 w-12 rounded-full ${backupSettings?.isActive ? 'bg-green-100' : 'bg-red-100'} flex items-center justify-center ml-4`}>
+            <Database className={`h-5 w-5 ${backupSettings?.isActive ? 'text-green-600' : 'text-red-600'}`} />
           </div>
           <div>
             <h3 className="text-lg font-bold">وضعیت بک‌آپ</h3>
-            <p className="text-sm text-green-600">فعال</p>
+            <p className={`text-sm ${backupSettings?.isActive ? 'text-green-600' : 'text-red-600'}`}>
+              {backupSettings?.isActive ? 'زمان‌بندی فعال' : 'زمان‌بندی غیرفعال'}
+            </p>
           </div>
         </div>
         <div className="flex justify-between items-center">

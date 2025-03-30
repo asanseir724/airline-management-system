@@ -5,6 +5,7 @@ interface TelegramResponse {
   status: boolean;
   message: string;
   messageId?: string;
+  data?: any;
 }
 
 /**
@@ -36,17 +37,8 @@ export class TelegramService {
         };
       }
 
-      // ساخت URL برای API تلگرام
-      const apiUrl = `https://api.telegram.org/bot${config.botToken}/sendMessage`;
-      
-      // ارسال پیام
-      const response = await axios.post(apiUrl, {
-        chat_id: config.channelId, // استفاده مستقیم از آیدی عددی کانال
-        text: message,
-        parse_mode: 'HTML'
-      }, {
-        timeout: 10000 // تایم‌اوت 10 ثانیه
-      });
+      // ارسال پیام به کانال
+      const response = await this.sendMessageToChannel(message, config.channelId, config.botToken);
 
       if (response.data && response.data.ok) {
         // ثبت در تاریخچه
@@ -105,6 +97,50 @@ export class TelegramService {
     } catch (error) {
       console.error('خطا در ذخیره تاریخچه تلگرام:', error);
       return false;
+    }
+  }
+  
+  /**
+   * ارسال پیام به کانال تلگرام با پارامترهای ورودی
+   * @param message متن پیام
+   * @param chatId آیدی چت یا کانال
+   * @param botToken توکن ربات
+   * @returns نتیجه ارسال پیام
+   */
+  static async sendMessageToChannel(
+    message: string,
+    chatId: string,
+    botToken: string
+  ): Promise<TelegramResponse> {
+    try {
+      // ساخت URL برای API تلگرام
+      const apiUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+      
+      // ارسال پیام
+      const response = await axios.post(apiUrl, {
+        chat_id: chatId,
+        text: message,
+        parse_mode: 'HTML'
+      }, {
+        timeout: 10000 // تایم‌اوت 10 ثانیه
+      });
+      
+      if (response.data && response.data.ok) {
+        return {
+          status: true,
+          message: 'پیام با موفقیت ارسال شد',
+          messageId: response.data.result?.message_id?.toString(),
+          data: response.data
+        };
+      } else {
+        throw new Error(response.data?.description || 'خطا در ارسال پیام تلگرام');
+      }
+    } catch (error) {
+      console.error('خطا در ارسال پیام به کانال تلگرام:', error);
+      return {
+        status: false,
+        message: error instanceof Error ? error.message : 'خطای ناشناخته در ارسال پیام به کانال تلگرام'
+      };
     }
   }
 }

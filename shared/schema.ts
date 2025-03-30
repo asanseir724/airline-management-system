@@ -131,6 +131,7 @@ export const backupSettings = pgTable("backup_settings", {
   time: text("time").notNull(), // 'HH:MM' format
   autoDelete: boolean("auto_delete").default(false).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
+  backupChannelId: text("backup_channel_id"), // آیدی کانال تلگرام برای بک‌آپ
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
@@ -139,6 +140,7 @@ export const insertBackupSettingsSchema = createInsertSchema(backupSettings).pic
   time: true,
   autoDelete: true,
   isActive: true,
+  backupChannelId: true,
 });
 
 // Type definitions

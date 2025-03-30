@@ -72,6 +72,41 @@ export function BackupSettingsComponent() {
     setFormData((prev) => ({ ...prev, autoDelete: checked }));
   };
   
+  const handleActiveChange = (checked: boolean) => {
+    setFormData((prev) => ({ ...prev, isActive: checked }));
+  };
+  
+  type ScheduleResponse = {
+    message: string;
+    settings: BackupSettings;
+  };
+  
+  const updateScheduleStatus = useMutation<ScheduleResponse, Error, boolean>({
+    mutationFn: async (active: boolean) => {
+      const response = await apiRequest("POST", `/api/backup/schedule`, { active });
+      return await response.json();
+    },
+    onSuccess: async (data) => {
+      toast({
+        title: data.message || "وضعیت زمان‌بندی با موفقیت تغییر کرد",
+        description: `زمان‌بندی بک‌آپ ${formData.isActive ? 'فعال' : 'غیرفعال'} شد`,
+      });
+      await queryClient.invalidateQueries({ queryKey: ["/api/backup-settings"] });
+    },
+    onError: (error) => {
+      toast({
+        title: "خطا در تغییر وضعیت زمان‌بندی",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+  
+  const handleScheduleStatusChange = (checked: boolean) => {
+    handleActiveChange(checked);
+    updateScheduleStatus.mutate(checked);
+  };
+  
   const handleSubmit = () => {
     updateSettings.mutate();
   };
@@ -136,6 +171,24 @@ export function BackupSettingsComponent() {
             <Switch
               checked={formData.autoDelete}
               onCheckedChange={handleAutoDeleteChange}
+            />
+          </div>
+
+          <div className="flex items-center justify-between pt-2 pb-2 border-t border-b my-3">
+            <div>
+              <label className="text-sm font-medium text-gray-700">
+                زمان‌بندی خودکار بک‌آپ
+              </label>
+              <p className="text-xs text-gray-500 mt-1">
+                {formData.isActive 
+                  ? "زمان‌بندی خودکار بک‌آپ فعال است" 
+                  : "زمان‌بندی خودکار بک‌آپ غیرفعال است"}
+              </p>
+            </div>
+            <Switch
+              checked={formData.isActive}
+              onCheckedChange={handleScheduleStatusChange}
+              disabled={updateScheduleStatus.isPending}
             />
           </div>
           

@@ -973,6 +973,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
       next(error);
     }
   });
+  
+  // API برای کنترل زمان‌بندی بک‌آپ
+  app.post("/api/backup/schedule", isAuthenticated, async (req, res, next) => {
+    try {
+      const { active } = req.body;
+      
+      // دریافت تنظیمات فعلی
+      const currentSettings = await storage.getBackupSettings();
+      if (!currentSettings) {
+        return res.status(404).json({ message: "تنظیمات بک‌آپ یافت نشد" });
+      }
+      
+      // به‌روزرسانی وضعیت فعال بودن
+      const updatedSettings = await storage.updateBackupSettings(currentSettings.id, {
+        isActive: active
+      });
+      
+      if (!updatedSettings) {
+        return res.status(500).json({ message: "خطا در به‌روزرسانی تنظیمات بک‌آپ" });
+      }
+      
+      // راه‌اندازی مجدد زمان‌بندی بک‌آپ
+      const SchedulerService = require("./services/scheduler").SchedulerService;
+      await SchedulerService.startBackupScheduler();
+      
+      // ثبت لاگ
+      await storage.createSystemLog({
+        level: 'info',
+        message: `زمان‌بندی بک‌آپ ${active ? 'فعال' : 'غیرفعال'} شد`,
+        module: 'backup-service',
+        details: { isActive: active }
+      });
+      
+      res.status(200).json({ 
+        message: `زمان‌بندی بک‌آپ با موفقیت ${active ? 'فعال' : 'غیرفعال'} شد`,
+        settings: updatedSettings 
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
 
   const httpServer = createServer(app);
 
