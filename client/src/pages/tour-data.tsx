@@ -117,6 +117,88 @@ export default function TourDataPage() {
       });
     },
   });
+  
+  // اسکرپ مستقیم از skyrotrip
+  const [skyroUrl, setSkyroUrl] = useState("");
+  const [skyroSourceId, setSkyroSourceId] = useState<number | undefined>(undefined);
+  const [skyroDestinationId, setSkyroDestinationId] = useState<number | undefined>(undefined);
+  const [isSkyroDialogOpen, setIsSkyroDialogOpen] = useState(false);
+  
+  const skyroScrapeMutation = useMutation({
+    mutationFn: async () => {
+      if (!skyroUrl || !skyroSourceId) {
+        throw new Error("آدرس تور و منبع انتخاب نشده است");
+      }
+      
+      const res = await apiRequest("POST", `/api/tour-data/skyro-scrape`, {
+        url: skyroUrl,
+        sourceId: skyroSourceId,
+        destinationId: skyroDestinationId
+      });
+      
+      if (!res.ok) {
+        const error = await res.text();
+        throw new Error(error || "خطا در استخراج اطلاعات تور از skyrotrip");
+      }
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tour-data"] });
+      toast({
+        title: "استخراج اطلاعات تور",
+        description: "اطلاعات تور با موفقیت از skyrotrip استخراج شد",
+      });
+      setIsSkyroDialogOpen(false);
+      setSkyroUrl("");
+    },
+    onError: (error) => {
+      toast({
+        title: "خطا",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // بروزرسانی تور موجود از skyrotrip
+  const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
+  const [updateTourId, setUpdateTourId] = useState<number | undefined>(undefined);
+  const [updateTourUrl, setUpdateTourUrl] = useState("");
+  
+  const skyroUpdateMutation = useMutation({
+    mutationFn: async () => {
+      if (!updateTourId || !updateTourUrl) {
+        throw new Error("آیدی تور یا آدرس آن انتخاب نشده است");
+      }
+      
+      const res = await apiRequest("POST", `/api/tour-data/${updateTourId}/skyro-update`, {
+        url: updateTourUrl
+      });
+      
+      if (!res.ok) {
+        const error = await res.text();
+        throw new Error(error || "خطا در بروزرسانی اطلاعات تور از skyrotrip");
+      }
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tour-data"] });
+      toast({
+        title: "بروزرسانی اطلاعات تور",
+        description: "اطلاعات تور با موفقیت از skyrotrip بروزرسانی شد",
+      });
+      setIsUpdateDialogOpen(false);
+      setUpdateTourUrl("");
+      setUpdateTourId(undefined);
+    },
+    onError: (error) => {
+      toast({
+        title: "خطا",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleViewDetails = (tour: TourData) => {
     setSelectedTour(tour);
@@ -176,7 +258,7 @@ export default function TourDataPage() {
     >
       <div className="mb-6">
         <div className="flex flex-col sm:flex-row justify-between gap-4 mb-4">
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button 
               variant="outline" 
               onClick={() => refetch()}
@@ -184,6 +266,13 @@ export default function TourDataPage() {
             >
               <RefreshCw className={`ml-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
               بروزرسانی
+            </Button>
+            
+            <Button 
+              variant="default"
+              onClick={() => setIsSkyroDialogOpen(true)}
+            >
+              استخراج از SkyroTrip
             </Button>
             
             <Select value={filter} onValueChange={setFilter}>
@@ -582,6 +671,127 @@ export default function TourDataPage() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+      
+      {/* Skyro Scrape Dialog */}
+      <Dialog open={isSkyroDialogOpen} onOpenChange={setIsSkyroDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>استخراج تور از SkyroTrip</DialogTitle>
+            <DialogDescription>
+              آدرس صفحه تور را وارد کنید تا اطلاعات آن استخراج شود.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label htmlFor="skyroUrl" className="text-sm font-medium">آدرس تور</label>
+              <Input
+                id="skyroUrl"
+                placeholder="https://skyrotrip.com/package/29"
+                value={skyroUrl}
+                onChange={(e) => setSkyroUrl(e.target.value)}
+              />
+              <p className="text-xs text-gray-500">مثال: https://skyrotrip.com/package/29</p>
+            </div>
+            
+            <div className="space-y-2">
+              <label htmlFor="skyroSourceId" className="text-sm font-medium">منبع تور</label>
+              <Select value={skyroSourceId?.toString()} onValueChange={(value) => setSkyroSourceId(parseInt(value))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="انتخاب منبع تور" />
+                </SelectTrigger>
+                <SelectContent>
+                  {/* ما اینجا از نتایج API استفاده می‌کنیم که در useQuery دیگری فراخوانی شده */}
+                  <SelectItem value="">انتخاب کنید</SelectItem>
+                  <SelectItem value="1">تور داخلی</SelectItem>
+                  <SelectItem value="2">تور خارجی</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <label htmlFor="skyroDestinationId" className="text-sm font-medium">مقصد تور (اختیاری)</label>
+              <Select 
+                value={skyroDestinationId?.toString() || ""} 
+                onValueChange={(value) => setSkyroDestinationId(value ? parseInt(value) : undefined)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="انتخاب مقصد تور" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">بدون مقصد</SelectItem>
+                  {destinations.map((destination) => (
+                    <SelectItem key={destination.id} value={destination.id.toString()}>
+                      {destination.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsSkyroDialogOpen(false)}
+            >
+              انصراف
+            </Button>
+            <Button 
+              onClick={() => skyroScrapeMutation.mutate()}
+              disabled={!skyroUrl || !skyroSourceId || skyroScrapeMutation.isPending}
+            >
+              {skyroScrapeMutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              استخراج تور
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Skyro Update Dialog */}
+      <Dialog open={isUpdateDialogOpen} onOpenChange={setIsUpdateDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>بروزرسانی تور از SkyroTrip</DialogTitle>
+            <DialogDescription>
+              آدرس صفحه تور را وارد کنید تا اطلاعات تور بروزرسانی شود.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label htmlFor="updateTourUrl" className="text-sm font-medium">آدرس جدید تور</label>
+              <Input
+                id="updateTourUrl"
+                placeholder="https://skyrotrip.com/package/29"
+                value={updateTourUrl}
+                onChange={(e) => setUpdateTourUrl(e.target.value)}
+              />
+              <p className="text-xs text-gray-500">مثال: https://skyrotrip.com/package/29</p>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsUpdateDialogOpen(false)}
+            >
+              انصراف
+            </Button>
+            <Button 
+              onClick={() => skyroUpdateMutation.mutate()}
+              disabled={!updateTourUrl || skyroUpdateMutation.isPending}
+            >
+              {skyroUpdateMutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              بروزرسانی تور
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </AirlineLayout>

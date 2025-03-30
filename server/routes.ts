@@ -7,6 +7,7 @@ import { TelegramService } from "./services/telegram";
 import { ReportService } from "./services/report";
 import { generateTelegramMessage } from "./services/telegram-message";
 import { scrapeTourSource } from "./services/scraping";
+import { SkyroScraper } from "./services/skyro-scraper";
 import fileUpload, { UploadedFile } from "express-fileupload";
 
 // حذف تعریف interface چون با تایپ های express-fileupload تداخل دارد
@@ -1705,6 +1706,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
     } catch (error) {
+      next(error);
+    }
+  });
+
+  // مسیر برای استخراج مستقیم اطلاعات تور از skyrotrip
+  app.post("/api/tour-data/skyro-scrape", isAuthenticated, async (req, res, next) => {
+    try {
+      const schema = z.object({
+        url: z.string().url(),
+        sourceId: z.number(),
+        destinationId: z.number().optional(),
+        brandId: z.number().optional()
+      });
+      
+      const validation = schema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          success: false,
+          message: "اطلاعات ورودی نامعتبر است",
+          errors: validation.error.errors
+        });
+      }
+      
+      const { url, sourceId, destinationId, brandId } = validation.data;
+      
+      // اسکرپ اطلاعات و ایجاد تور جدید
+      const result = await SkyroScraper.createTourFromSkyroTrip(url, sourceId, destinationId, brandId);
+      
+      if (result.success) {
+        res.json({
+          success: true,
+          message: "تور با موفقیت از skyrotrip.com استخراج و ذخیره شد",
+          tourId: result.tourId
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          message: result.message
+        });
+      }
+    } catch (error) {
+      console.error('Error in skyro scraping:', error);
+      
+      // ثبت لاگ خطا
+      await storage.createTourLog({
+        level: "ERROR",
+        message: "خطا در اسکرپ تور از سایت skyrotrip",
+        content: error instanceof Error ? error.message : 'خطای ناشناخته'
+      });
+      
+      next(error);
+    }
+  });
+  
+  // مسیر برای بروزرسانی اطلاعات تور موجود از skyrotrip
+  app.post("/api/tour-data/:id/skyro-update", isAuthenticated, async (req, res, next) => {
+    try {
+      const tourId = parseInt(req.params.id);
+      const schema = z.object({
+        url: z.string().url()
+      });
+      
+      const validation = schema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          success: false,
+          message: "آدرس ورودی نامعتبر است",
+          errors: validation.error.errors
+        });
+      }
+      
+      const { url } = validation.data;
+      
+      // بروزرسانی اطلاعات تور
+      const result = await SkyroScraper.updateTourData(tourId, url);
+      
+      if (result.success) {
+        res.json({
+          success: true,
+          message: "اطلاعات تور با موفقیت از skyrotrip.com بروزرسانی شد"
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          message: result.message
+        });
+      }
+    } catch (error) {
+      console.error('Error in updating tour from skyro:', error);
+      
+      // ثبت لاگ خطا
+      await storage.createTourLog({
+        level: "ERROR",
+        message: "خطا در بروزرسانی اطلاعات تور از سایت skyrotrip",
+        content: error instanceof Error ? error.message : 'خطای ناشناخته'
+      });
+      
       next(error);
     }
   });

@@ -47,6 +47,13 @@ export class TelegramService {
           message: `تور "${tourTitle}" با موفقیت به تلگرام ارسال شد`,
           content: message.substring(0, 200) + "..."
         });
+        
+        // ثبت در تاریخچه تور
+        await storage.createTourHistory({
+          destinationName: tourTitle,
+          content: message.substring(0, 200) + "...",
+          status: 'sent'
+        });
 
         return {
           status: true,
