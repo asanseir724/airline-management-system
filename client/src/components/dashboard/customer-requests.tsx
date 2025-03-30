@@ -18,7 +18,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Eye, Loader2 } from "lucide-react";
+import { Eye, Loader2, Search, Filter } from "lucide-react";
 import { CustomerRequest, SmsTemplate } from "@shared/schema";
 import { useState } from "react";
 import {
@@ -28,6 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -146,6 +147,11 @@ function CustomerRequestDetail({ request, onClose }: CustomerRequestDetailProps)
         </div>
 
         <div className="space-y-2">
+          <p className="text-sm font-medium">کد پیگیری:</p>
+          <p className="text-sm text-gray-700 font-mono">{request.trackingCode}</p>
+        </div>
+
+        <div className="space-y-2">
           <p className="text-sm font-medium">علت استرداد:</p>
           <p className="text-sm text-gray-700">{request.refundReason}</p>
         </div>
@@ -225,6 +231,9 @@ function CustomerRequestDetail({ request, onClose }: CustomerRequestDetailProps)
 // Main Customer Requests Component
 export function CustomerRequestsComponent() {
   const [selectedRequest, setSelectedRequest] = useState<CustomerRequest | null>(null);
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [searchBy, setSearchBy] = useState<"voucherNumber" | "trackingCode" | "phoneNumber">("voucherNumber");
 
   const { data, isLoading, isError } = useQuery<CustomerRequest[]>({
     queryKey: ["/api/customer-requests"],
@@ -238,6 +247,28 @@ export function CustomerRequestsComponent() {
   const handleCloseDetail = () => {
     setSelectedRequest(null);
   };
+  
+  // فیلتر کردن داده‌ها بر اساس جستجو و فیلترها
+  const filteredData = data?.filter((request) => {
+    // فیلتر وضعیت
+    if (statusFilter !== "all" && request.status !== statusFilter) {
+      return false;
+    }
+    
+    // جستجو بر اساس نوع جستجو
+    if (searchTerm && searchTerm.length > 0) {
+      const term = searchTerm.toLowerCase();
+      if (searchBy === "voucherNumber") {
+        return request.voucherNumber.toLowerCase().includes(term);
+      } else if (searchBy === "trackingCode") {
+        return request.trackingCode.toLowerCase().includes(term);
+      } else if (searchBy === "phoneNumber") {
+        return request.phoneNumber.toLowerCase().includes(term);
+      }
+    }
+    
+    return true;
+  });
 
   if (isLoading) {
     return (
@@ -280,6 +311,49 @@ export function CustomerRequestsComponent() {
         </CardDescription>
       </CardHeader>
       <CardContent>
+        {/* بخش جستجو و فیلتر */}
+        <div className="mb-6 bg-gray-50 p-4 rounded-md">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <Label className="text-sm mb-2 block">جستجو بر اساس</Label>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <Input
+                    placeholder="جستجو..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full"
+                  />
+                </div>
+                <Select value={searchBy} onValueChange={(value: any) => setSearchBy(value)}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="نوع جستجو" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="voucherNumber">شماره واچر</SelectItem>
+                    <SelectItem value="trackingCode">کد پیگیری</SelectItem>
+                    <SelectItem value="phoneNumber">شماره موبایل</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="w-full md:w-48">
+              <Label className="text-sm mb-2 block">وضعیت</Label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="همه" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">همه</SelectItem>
+                  <SelectItem value="pending">در انتظار بررسی</SelectItem>
+                  <SelectItem value="approved">تایید شده</SelectItem>
+                  <SelectItem value="rejected">رد شده</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
         <Table>
           <TableCaption>لیست درخواست‌های استرداد</TableCaption>
           <TableHeader>
@@ -288,19 +362,21 @@ export function CustomerRequestsComponent() {
               <TableHead className="text-right">مسافر</TableHead>
               <TableHead className="text-right">شماره تماس</TableHead>
               <TableHead className="text-right">شماره واچر</TableHead>
+              <TableHead className="text-right">کد پیگیری</TableHead>
               <TableHead className="text-right">تاریخ ثبت</TableHead>
               <TableHead className="text-right">وضعیت</TableHead>
               <TableHead className="text-right">عملیات</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data && data.length > 0 ? (
-              data.map((request) => (
+            {filteredData && filteredData.length > 0 ? (
+              filteredData.map((request) => (
                 <TableRow key={request.id}>
                   <TableCell className="font-medium">{request.id}</TableCell>
                   <TableCell>{request.accountOwner}</TableCell>
                   <TableCell>{request.phoneNumber}</TableCell>
                   <TableCell>{request.voucherNumber}</TableCell>
+                  <TableCell>{request.trackingCode}</TableCell>
                   <TableCell>{format(new Date(request.createdAt), "yyyy/MM/dd")}</TableCell>
                   <TableCell>{getStatusBadge(request.status)}</TableCell>
                   <TableCell>
@@ -317,7 +393,7 @@ export function CustomerRequestsComponent() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center">
+                <TableCell colSpan={8} className="h-24 text-center">
                   درخواستی ثبت نشده است
                 </TableCell>
               </TableRow>
