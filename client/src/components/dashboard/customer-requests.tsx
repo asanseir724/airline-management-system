@@ -236,7 +236,36 @@ export function CustomerRequestsComponent() {
   const [searchBy, setSearchBy] = useState<"voucherNumber" | "trackingCode" | "phoneNumber">("voucherNumber");
 
   const { data, isLoading, isError } = useQuery<CustomerRequest[]>({
-    queryKey: ["/api/customer-requests"],
+    queryKey: ["/api/customer-requests", searchTerm],
+    queryFn: async () => {
+      // اگر عبارت جستجو وجود داشته باشد، جستجو را با API انجام بده
+      if (searchTerm && searchTerm.trim() !== "") {
+        const response = await fetch(`/api/customer-requests?search=${encodeURIComponent(searchTerm)}`);
+        
+        // اگر پاسخ 401 بود، مشکل خطای احراز هویت است
+        if (response.status === 401) {
+          throw new Error("لطفاً مجدداً وارد شوید");
+        }
+        
+        if (!response.ok) {
+          throw new Error("خطا در جستجوی درخواست‌ها");
+        }
+        return await response.json();
+      }
+      
+      // در غیر این صورت، همه درخواست‌ها را دریافت کن
+      const response = await fetch("/api/customer-requests");
+      
+      // اگر پاسخ 401 بود، مشکل خطای احراز هویت است
+      if (response.status === 401) {
+        throw new Error("لطفاً مجدداً وارد شوید");
+      }
+      
+      if (!response.ok) {
+        throw new Error("خطا در دریافت درخواست‌ها");
+      }
+      return await response.json();
+    },
     staleTime: 1000 * 60, // 1 minute
   });
 

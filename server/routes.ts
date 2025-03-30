@@ -695,8 +695,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.get("/api/customer-requests", isAuthenticated, async (req, res, next) => {
+  app.get("/api/customer-requests", async (req, res, next) => {
     try {
+      // چک کردن احراز هویت کاربر
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "برای مشاهده درخواست‌های مشتریان نیاز است ابتدا وارد حساب کاربری خود شوید" });
+      }
+      
       const { search } = req.query;
       
       // اگر پارامتر جستجو ارسال شده بود، درخواست‌ها را فیلتر کنیم
@@ -723,8 +728,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.get("/api/customer-requests/:id", isAuthenticated, async (req, res, next) => {
+  app.get("/api/customer-requests/:id", async (req, res, next) => {
     try {
+      // چک کردن احراز هویت کاربر
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "برای مشاهده جزئیات درخواست نیاز است ابتدا وارد حساب کاربری خود شوید" });
+      }
+      
       const id = parseInt(req.params.id);
       const request = await storage.getCustomerRequestById(id);
       if (!request) {
@@ -736,8 +746,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.patch("/api/customer-requests/:id/status", isAuthenticated, async (req, res, next) => {
+  app.patch("/api/customer-requests/:id/status", async (req, res, next) => {
     try {
+      // چک کردن احراز هویت کاربر
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "برای تغییر وضعیت درخواست نیاز است ابتدا وارد حساب کاربری خود شوید" });
+      }
+      
       const id = parseInt(req.params.id);
       const statusSchema = z.object({ 
         status: z.enum(["pending", "approved", "rejected"]),
