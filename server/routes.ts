@@ -1949,12 +1949,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // گرفتن اطلاعات metadata برای استخراج خدمات، هتل‌ها و غیره
+      // اولویت: استفاده از خود فیلد در صورت موجود بودن، در غیر این صورت تلاش برای بررسی وجود در metadata
+      const services = tourData.services || 
+                      (tourData.metadata && typeof tourData.metadata === 'object' && 'services' in tourData.metadata
+                        ? tourData.metadata.services
+                        : []);
+      
+      const hotels = tourData.hotels || 
+                    (tourData.metadata && typeof tourData.metadata === 'object' && 'hotels' in tourData.metadata
+                      ? tourData.metadata.hotels
+                      : []);
+                      
+      const requiredDocuments = tourData.requiredDocuments || 
+                              (tourData.metadata && typeof tourData.metadata === 'object' && 'requiredDocuments' in tourData.metadata
+                                ? tourData.metadata.requiredDocuments 
+                                : []);
+      
+      console.log("Services:", services);
+      console.log("Hotels:", hotels);
+      console.log("Required documents:", requiredDocuments);
+      
       const extendedTourData = {
         ...tourData,
         metadata: tourData.metadata as Record<string, any> | null,
-        services: tourData.services || [],
-        hotels: tourData.hotels || [],
-        requiredDocuments: tourData.requiredDocuments || [],
+        services: services,
+        hotels: hotels,
+        requiredDocuments: requiredDocuments,
         cancellationPolicy: tourData.cancellationPolicy || null,
       };
       

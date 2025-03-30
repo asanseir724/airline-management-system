@@ -626,13 +626,13 @@ export default function TourDataPage() {
                     )}
 
                     {/* مدارک مورد نیاز */}
-                    {selectedTour.requiredDocuments.length > 0 && (
+                    {selectedTour.requiredDocuments && selectedTour.requiredDocuments.length > 0 && (
                       <div className="mb-4">
                         <div className="font-medium mb-2">مدارک مورد نیاز:</div>
                         <div className="bg-gray-50 p-3 rounded-md">
                           <ul className="list-disc list-inside space-y-1">
                             {selectedTour.requiredDocuments.map((doc, index) => (
-                              <li key={index}>{doc}</li>
+                              <li key={index}>{String(doc)}</li>
                             ))}
                           </ul>
                         </div>

@@ -67,15 +67,32 @@ export function generateTelegramMessage(tour: ExtendedTourData): string {
   
   // اطلاعات هتل‌ها
   message += `*🏨 لیست هتل‌ها بر اساس ستاره:*\n\n`;
+  
+  console.log("Hotels in message generator:", tour.hotels);
+  
   if (tour.hotels && Array.isArray(tour.hotels) && tour.hotels.length > 0) {
-    // مرتب سازی هتل‌ها بر اساس تعداد ستاره (از کم به زیاد)
-    const sortedHotels = [...tour.hotels].sort((a: any, b: any) => a.stars - b.stars);
-    
-    sortedHotels.forEach((hotel: Hotel) => {
-      const stars = starsToEmoji(hotel.stars);
-      const price = hotel.price !== 'نامشخص' ? `- قیمت: ${hotel.price}` : '';
-      message += `${stars} هتل ${hotel.name} ${price}\n`;
-    });
+    try {
+      // مرتب سازی هتل‌ها بر اساس تعداد ستاره (از کم به زیاد)
+      // اول مطمئن شویم که همه هتل‌ها دارای فیلد stars هستند
+      const validHotels = tour.hotels.filter((hotel: any) => 
+        hotel && typeof hotel === 'object' && 'stars' in hotel && typeof hotel.stars === 'number'
+      );
+      
+      if (validHotels.length > 0) {
+        const sortedHotels = [...validHotels].sort((a: any, b: any) => a.stars - b.stars);
+        
+        sortedHotels.forEach((hotel: Hotel) => {
+          const stars = starsToEmoji(hotel.stars || 0);
+          const price = hotel.price && hotel.price !== 'نامشخص' ? `- قیمت: ${hotel.price}` : '';
+          message += `${stars} هتل ${hotel.name || 'نامشخص'} ${price}\n`;
+        });
+      } else {
+        message += `اطلاعات هتل در دسترس نیست (هتل‌ها بدون ستاره).\n`;
+      }
+    } catch (error) {
+      console.error("Error processing hotels for telegram message:", error);
+      message += `خطا در پردازش اطلاعات هتل.\n`;
+    }
     message += '\n';
   } else {
     message += `اطلاعات هتل در دسترس نیست.\n\n`;
