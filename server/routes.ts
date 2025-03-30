@@ -1807,6 +1807,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // روت برای استخراج چندگانه تورها
+  app.post("/api/tour-data/skyro-scrape-multiple", isAuthenticated, async (req, res, next) => {
+    try {
+      const schema = z.object({
+        sourceUrl: z.string().url(),
+        sourceId: z.number()
+      });
+      
+      const validation = schema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          success: false,
+          message: "اطلاعات ورودی نامعتبر است",
+          errors: validation.error.errors
+        });
+      }
+      
+      const { sourceUrl, sourceId } = validation.data;
+      
+      // شروع فرآیند استخراج چندگانه در پس‌زمینه
+      const scrapeMultiplePromise = SkyroScraper.scrapeMultipleTours(sourceUrl, sourceId);
+      
+      // ارسال یک پاسخ سریع به کاربر
+      res.json({ 
+        success: true, 
+        message: "فرآیند استخراج تورها شروع شد. این فرآیند ممکن است چندین دقیقه طول بکشد."
+      });
+      
+      // ادامه پردازش در پس‌زمینه
+      try {
+        const result = await scrapeMultiplePromise;
+        
+        // ثبت نتیجه نهایی در لاگ سیستم
+        await storage.createSystemLog({
+          level: result.success ? 'info' : 'error',
+          message: `نتیجه استخراج چندگانه تور: ${result.message}`,
+          module: 'tour-scraping',
+          details: { 
+            sourceUrl, 
+            sourceId,
+            toursProcessed: result.toursProcessed,
+            toursAdded: result.toursAdded
+          }
+        });
+      } catch (bgError) {
+        // ثبت خطای پس‌زمینه در لاگ سیستم
+        await storage.createSystemLog({
+          level: 'error',
+          message: `خطا در استخراج چندگانه تور`,
+          module: 'tour-scraping',
+          details: { 
+            sourceUrl, 
+            sourceId,
+            error: bgError instanceof Error ? bgError.message : 'خطای ناشناخته'
+          }
+        });
+      }
+      
+    } catch (error) {
+      next(error);
+    }
+  });
+  
   app.get("/api/tour-data", isAuthenticated, async (req, res, next) => {
     try {
       const { sourceId } = req.query;

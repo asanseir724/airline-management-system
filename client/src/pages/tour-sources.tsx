@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus, Trash2, RefreshCw, Calendar, Edit } from "lucide-react";
+import { Loader2, Plus, Trash2, RefreshCw, Calendar, Edit, Download } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -162,6 +162,51 @@ export default function TourSources() {
       });
     },
   });
+  
+  // استخراج چندگانه تورها از اسکایرو
+  const [isMultipleScrapeDialogOpen, setIsMultipleScrapeDialogOpen] = useState(false);
+  const [multipleScrapingSourceId, setMultipleScrapingSourceId] = useState<number | null>(null);
+  const [multipleScrapingSourceUrl, setMultipleScrapingSourceUrl] = useState("");
+  
+  // Multiple scrape mutation
+  const scrapeMultipleMutation = useMutation({
+    mutationFn: async () => {
+      if (!multipleScrapingSourceId || !multipleScrapingSourceUrl) {
+        throw new Error("لطفا منبع و آدرس را انتخاب کنید");
+      }
+      
+      const res = await apiRequest("POST", `/api/tour-data/skyro-scrape-multiple`, {
+        sourceUrl: multipleScrapingSourceUrl,
+        sourceId: multipleScrapingSourceId
+      });
+      
+      if (!res.ok) {
+        const error = await res.text();
+        throw new Error(error || "خطا در استخراج چندگانه تورها");
+      }
+      
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tour-sources"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tour-data"] });
+      setIsMultipleScrapeDialogOpen(false);
+      setMultipleScrapingSourceId(null);
+      setMultipleScrapingSourceUrl("");
+      
+      toast({
+        title: "استخراج چندگانه تورها",
+        description: "فرآیند استخراج چندگانه تورها شروع شد. این فرآیند ممکن است چندین دقیقه طول بکشد.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "خطا",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleAddSource = () => {
     if (!name || !url) {
@@ -237,20 +282,51 @@ export default function TourSources() {
     return formatPersianDate(lastScraped);
   };
 
+  // Multiple scrape handler
+  const handleMultipleToursScrape = () => {
+    if (!multipleScrapingSourceId || !multipleScrapingSourceUrl) {
+      toast({
+        title: "اطلاعات ناقص",
+        description: "لطفا منبع و آدرس استخراج چندگانه را وارد کنید",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    scrapeMultipleMutation.mutate();
+  };
+
+  // Prepare for multiple scrape with a selected source
+  const prepareForMultipleScrape = (source: TourSource) => {
+    setMultipleScrapingSourceId(source.id);
+    setMultipleScrapingSourceUrl("");
+    setIsMultipleScrapeDialogOpen(true);
+  };
+
   return (
     <AirlineLayout 
       title="مدیریت منابع تور" 
       subtitle="استخراج خودکار اطلاعات تور از منابع مختلف"
     >
       <div className="flex justify-between mb-6">
-        <Button 
-          variant="outline" 
-          onClick={() => refetch()}
-          disabled={isLoading}
-        >
-          <RefreshCw className={`ml-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-          بروزرسانی
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => refetch()}
+            disabled={isLoading}
+          >
+            <RefreshCw className={`ml-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            بروزرسانی
+          </Button>
+          
+          <Button
+            variant="outline"
+            onClick={() => setIsMultipleScrapeDialogOpen(true)}
+          >
+            <Download className="ml-2 h-4 w-4" />
+            استخراج چندگانه تورها
+          </Button>
+        </div>
         
         <Button onClick={() => setIsAddDialogOpen(true)}>
           <Plus className="ml-2 h-4 w-4" /> 
@@ -319,6 +395,14 @@ export default function TourSources() {
                       >
                         <RefreshCw className={`h-4 w-4 ml-1 ${scrapeMutation.isPending ? 'animate-spin' : ''}`} />
                         استخراج 
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => prepareForMultipleScrape(source)}
+                      >
+                        <Download className="h-4 w-4 ml-1" />
+                        استخراج چندگانه
                       </Button>
                       <Button 
                         variant="ghost" 
@@ -532,6 +616,68 @@ export default function TourSources() {
                 <Loader2 className="ml-2 h-4 w-4 animate-spin" />
               )}
               ذخیره تغییرات
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Multiple Scrape Dialog */}
+      <Dialog open={isMultipleScrapeDialogOpen} onOpenChange={setIsMultipleScrapeDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>استخراج چندگانه تورها</DialogTitle>
+            <DialogDescription>
+              این قابلیت به شما امکان می‌دهد تمامی تورهای موجود در یک صفحه لیست تور را به صورت خودکار استخراج کنید.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="sourceId">منبع تور</Label>
+              <Select 
+                value={multipleScrapingSourceId?.toString() || ""} 
+                onValueChange={(value) => setMultipleScrapingSourceId(parseInt(value))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="انتخاب منبع تور" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sources.map((source) => (
+                    <SelectItem key={source.id} value={source.id.toString()}>
+                      {source.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="grid gap-2">
+              <Label htmlFor="sourceUrl">آدرس صفحه لیست تورها</Label>
+              <Input 
+                id="sourceUrl" 
+                value={multipleScrapingSourceUrl} 
+                onChange={(e) => setMultipleScrapingSourceUrl(e.target.value)} 
+                placeholder="https://skyrotrip.com/search/iran" 
+                dir="ltr"
+              />
+              <p className="text-sm text-muted-foreground">
+                آدرس باید به صفحه‌ای اشاره کند که لیستی از تورها را نمایش می‌دهد. مثلاً صفحه جستجو یا دسته‌بندی تورها.
+              </p>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsMultipleScrapeDialogOpen(false)}>
+              انصراف
+            </Button>
+            <Button 
+              onClick={handleMultipleToursScrape}
+              disabled={scrapeMultipleMutation.isPending}
+            >
+              {scrapeMultipleMutation.isPending && (
+                <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+              )}
+              شروع استخراج چندگانه
             </Button>
           </DialogFooter>
         </DialogContent>
