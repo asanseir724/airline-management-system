@@ -679,6 +679,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.get("/api/customer-requests", isAuthenticated, async (req, res, next) => {
     try {
+      const { search } = req.query;
+      
+      // اگر پارامتر جستجو ارسال شده بود، درخواست‌ها را فیلتر کنیم
+      if (search && typeof search === 'string') {
+        const searchQuery = search.trim().toLowerCase();
+        const allRequests = await storage.getCustomerRequests();
+        
+        // جستجو بر اساس کد پیگیری، شماره واچر یا شماره موبایل
+        const filteredRequests = allRequests.filter(request => 
+          request.trackingCode?.toLowerCase().includes(searchQuery) || 
+          request.voucherNumber?.toLowerCase().includes(searchQuery) ||
+          request.phoneNumber?.toLowerCase().includes(searchQuery) ||
+          request.accountOwner?.toLowerCase().includes(searchQuery)
+        );
+        
+        return res.json(filteredRequests);
+      }
+      
+      // در غیر این صورت، تمام درخواست‌ها را برگردان
       const requests = await storage.getCustomerRequests();
       res.json(requests);
     } catch (error) {
