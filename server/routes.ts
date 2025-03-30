@@ -1707,14 +1707,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const metadata = tourData.metadata as any;
       const extendedTourData = {
         ...tourData,
-        services: metadata?.services || [],
-        hotels: metadata?.hotels || [],
-        requiredDocuments: metadata?.requiredDocuments || [],
-        cancellationPolicy: metadata?.cancellationPolicy || "",
+        metadata: tourData.metadata as Record<string, any> | null,
+        services: tourData.services || [],
+        hotels: tourData.hotels || [],
+        requiredDocuments: tourData.requiredDocuments || [],
+        cancellationPolicy: tourData.cancellationPolicy || null,
       };
       
       // تولید پیام تلگرام با استفاده از تابع
-      const telegramMessage = generateTelegramMessage(extendedTourData);
+      const telegramMessage = generateTelegramMessage(extendedTourData as any);
       
       res.json({ message: telegramMessage });
     } catch (error) {

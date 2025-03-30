@@ -22,12 +22,27 @@ type Hotel = {
   price: string;
 }
 
-interface ExtendedTourData extends TourData {
-  services?: string[];
-  hotels?: Hotel[];
-  requiredDocuments?: string[];
-  cancellationPolicy?: string;
+export interface ExtendedTourData {
+  id: number;
+  title: string;
+  description: string | null;
+  price: string | null;
+  duration: string | null;
+  imageUrl: string | null;
+  originalUrl: string | null;
+  destinationId: number | null;
+  brandId: number | null;
+  sourceId: number | null;
+  isPublished: boolean;
+  metadata: Record<string, any> | null;
+  services: any;
+  hotels: any;
+  requiredDocuments: any;
+  cancellationPolicy: string | null;
   link?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  scrapedAt: Date;
 }
 
 export function generateTelegramMessage(tour: ExtendedTourData): string {
@@ -41,8 +56,8 @@ export function generateTelegramMessage(tour: ExtendedTourData): string {
   
   // خدمات تور
   message += `✨ خدمات تور:\n\n`;
-  if (tour.services && tour.services.length > 0) {
-    tour.services.forEach(service => {
+  if (tour.services && Array.isArray(tour.services) && tour.services.length > 0) {
+    tour.services.forEach((service: any) => {
       message += `✅ ${service}\n`;
     });
     message += '\n';
@@ -52,11 +67,11 @@ export function generateTelegramMessage(tour: ExtendedTourData): string {
   
   // اطلاعات هتل‌ها
   message += `🏨 لیست هتل‌ها بر اساس ستاره:\n\n`;
-  if (tour.hotels && tour.hotels.length > 0) {
+  if (tour.hotels && Array.isArray(tour.hotels) && tour.hotels.length > 0) {
     // مرتب سازی هتل‌ها بر اساس تعداد ستاره (از کم به زیاد)
-    const sortedHotels = [...tour.hotels].sort((a, b) => a.stars - b.stars);
+    const sortedHotels = [...tour.hotels].sort((a: any, b: any) => a.stars - b.stars);
     
-    sortedHotels.forEach(hotel => {
+    sortedHotels.forEach((hotel: Hotel) => {
       const stars = starsToEmoji(hotel.stars);
       const price = hotel.price !== 'نامشخص' ? `- قیمت: ${hotel.price}` : '';
       message += `${stars} هتل ${hotel.name} ${price}\n`;
@@ -67,9 +82,9 @@ export function generateTelegramMessage(tour: ExtendedTourData): string {
   }
   
   // مدارک مورد نیاز
-  if (tour.requiredDocuments && tour.requiredDocuments.length > 0) {
+  if (tour.requiredDocuments && Array.isArray(tour.requiredDocuments) && tour.requiredDocuments.length > 0) {
     message += `📄 مدارک مورد نیاز:\n\n`;
-    tour.requiredDocuments.forEach(doc => {
+    tour.requiredDocuments.forEach((doc: any) => {
       message += `• ${doc}\n`;
     });
     message += '\n';
