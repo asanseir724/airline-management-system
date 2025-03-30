@@ -24,7 +24,7 @@ export class TelegramService {
     message: string,
     requestId?: number,
     customerName: string = '',
-    requestType: string = ''
+    requestType: string = 'request'
   ): Promise<TelegramResponse> {
     try {
       // دریافت تنظیمات تلگرام
@@ -120,7 +120,7 @@ export class TelegramService {
       const response = await axios.post(apiUrl, {
         chat_id: chatId,
         text: message,
-        parse_mode: 'HTML'
+        parse_mode: 'Markdown'
       }, {
         timeout: 10000 // تایم‌اوت 10 ثانیه
       });

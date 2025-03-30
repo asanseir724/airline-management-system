@@ -1766,6 +1766,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
       next(error);
     }
   });
+  
+  // API برای ارسال تور به تلگرام
+  app.post("/api/tour-data/:id/send-telegram", isAuthenticated, async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      // دریافت اطلاعات تور
+      const tourData = await storage.getTourDataById(id);
+      
+      if (!tourData) {
+        return res.status(404).json({ message: "اطلاعات تور یافت نشد" });
+      }
+      
+      // دریافت تنظیمات تلگرام
+      const telegramConfig = await storage.getTelegramConfig();
+      if (!telegramConfig || !telegramConfig.isActive) {
+        return res.status(400).json({ 
+          message: "سرویس تلگرام غیرفعال است یا تنظیمات یافت نشد" 
+        });
+      }
+      
+      // گرفتن اطلاعات metadata برای استخراج خدمات، هتل‌ها و غیره
+      const extendedTourData = {
+        ...tourData,
+        metadata: tourData.metadata as Record<string, any> | null,
+        services: tourData.services || [],
+        hotels: tourData.hotels || [],
+        requiredDocuments: tourData.requiredDocuments || [],
+        cancellationPolicy: tourData.cancellationPolicy || null,
+      };
+      
+      // تولید پیام تلگرام با استفاده از تابع
+      const telegramMessage = generateTelegramMessage(extendedTourData as any);
+      
+      // ارسال پیام به تلگرام
+      const result = await TelegramService.sendMessage(
+        telegramMessage,
+        tourData.id,
+        tourData.title,
+        'tour'
+      );
+      
+      if (result.status) {
+        // ثبت لاگ
+        await storage.createTourLog({
+          level: "INFO",
+          message: `اطلاعات تور "${tourData.title}" به کانال تلگرام ارسال شد`,
+          content: telegramMessage.substring(0, 200) + "..."
+        });
+        
+        res.json({ 
+          success: true, 
+          message: "اطلاعات تور با موفقیت به کانال تلگرام ارسال شد"
+        });
+      } else {
+        throw new Error(result.message);
+      }
+    } catch (error: any) {
+      // ثبت لاگ خطا
+      await storage.createTourLog({
+        level: "ERROR",
+        message: `خطا در ارسال اطلاعات تور به تلگرام`,
+        content: error.message
+      });
+      
+      res.status(500).json({ 
+        success: false, 
+        message: error.message || "خطا در ارسال به تلگرام" 
+      });
+    }
+  });
 
   const httpServer = createServer(app);
 
