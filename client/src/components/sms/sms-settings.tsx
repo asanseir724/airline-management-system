@@ -138,84 +138,11 @@ export function SmsSettingsComponent() {
               )}
             />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FormField
-                control={form.control}
-                name="defaultLine"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>شماره خط پیش‌فرض</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="980000000"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      شماره خط پیش‌فرض برای ارسال پیامک
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="backupLine"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>شماره خط پشتیبان</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="980000000"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      شماره خط پشتیبان برای مواقعی که خط اصلی دچار مشکل شود
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FormField
-                control={form.control}
-                name="username"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>نام کاربری (اختیاری)</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="نام کاربری آموت‌اس‌ام‌اس"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>رمز عبور (اختیاری)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="password"
-                        placeholder="رمز عبور آموت‌اس‌ام‌اس"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            {/* فیلدهای مخفی برای شماره خط پیش‌فرض و پشتیبان */}
+            <input type="hidden" {...form.register("defaultLine")} value="980000000" />
+            <input type="hidden" {...form.register("backupLine")} value="980000000" />
+            <input type="hidden" {...form.register("username")} value="" />
+            <input type="hidden" {...form.register("password")} value="" />
 
             <FormField
               control={form.control}
