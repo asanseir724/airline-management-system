@@ -489,16 +489,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.post("/api/backup", isAuthenticated, async (req, res, next) => {
     try {
-      // In a real app, we would trigger actual backup here
-      // For now, just create a record
-      const backup = await storage.createBackupHistory({
-        filename: `backup_${new Date().toISOString().replace(/[:.]/g, "")}.sql`,
-        size: "125 مگابایت",
-        type: "manual"
-      });
+      // استفاده از سرویس بک‌آپ برای تهیه و ارسال بک‌آپ
+      const { BackupService } = await import('./services/backup');
+      const backupResult = await BackupService.createAndSendBackup('manual');
       
-      res.status(201).json(backup);
+      if (!backupResult.success) {
+        return res.status(500).json({ 
+          message: backupResult.message,
+          success: false
+        });
+      }
+      
+      // دریافت بک‌آپ ایجاد شده از دیتابیس
+      const history = await storage.getBackupHistory();
+      const latestBackup = history
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+      
+      res.status(201).json(latestBackup);
     } catch (error) {
+      console.error("Error creating manual backup:", error);
       next(error);
     }
   });
@@ -995,7 +1004,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // راه‌اندازی مجدد زمان‌بندی بک‌آپ
-      const SchedulerService = require("./services/scheduler").SchedulerService;
+      const { SchedulerService } = await import("./services/scheduler");
       await SchedulerService.startBackupScheduler();
       
       // ثبت لاگ

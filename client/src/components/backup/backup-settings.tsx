@@ -26,7 +26,8 @@ export function BackupSettingsComponent() {
     frequency: "daily",
     time: "00:00",
     autoDelete: false,
-    isActive: true
+    isActive: true,
+    backupChannelId: "", // آیدی کانال تلگرام برای ارسال بک‌آپ
   });
   
   // Update form data when settings are loaded
@@ -36,7 +37,8 @@ export function BackupSettingsComponent() {
         frequency: settings.frequency,
         time: settings.time,
         autoDelete: settings.autoDelete,
-        isActive: settings.isActive
+        isActive: settings.isActive,
+        backupChannelId: settings.backupChannelId || "",
       });
     }
   }, [settings]);
@@ -74,6 +76,10 @@ export function BackupSettingsComponent() {
   
   const handleActiveChange = (checked: boolean) => {
     setFormData((prev) => ({ ...prev, isActive: checked }));
+  };
+  
+  const handleChannelIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData((prev) => ({ ...prev, backupChannelId: e.target.value }));
   };
   
   type ScheduleResponse = {
@@ -172,6 +178,28 @@ export function BackupSettingsComponent() {
               checked={formData.autoDelete}
               onCheckedChange={handleAutoDeleteChange}
             />
+          </div>
+          
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-medium text-gray-700">
+                آیدی کانال تلگرام برای ارسال بک‌آپ
+              </label>
+              <span className="text-xs text-gray-500">
+                مثال: -1001234567890
+              </span>
+            </div>
+            <Input
+              type="text"
+              value={formData.backupChannelId || ""}
+              onChange={handleChannelIdChange}
+              className="w-full text-left"
+              placeholder="-1001234567890"
+              dir="ltr"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              آیدی کانال تلگرام را وارد کنید. برای کانال‌های خصوصی، باید با - شروع شود.
+            </p>
           </div>
 
           <div className="flex items-center justify-between pt-2 pb-2 border-t border-b my-3">
