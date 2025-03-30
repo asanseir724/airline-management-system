@@ -121,7 +121,7 @@ export function SmsForm() {
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="">الگوی پیامک را انتخاب کنید</SelectItem>
+                  <SelectItem value="none">الگوی پیامک را انتخاب کنید</SelectItem>
                   {templates.map((template) => (
                     <SelectItem key={template.id} value={template.id.toString()}>
                       {template.name}

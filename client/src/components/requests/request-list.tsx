@@ -161,7 +161,7 @@ export function RequestList() {
                   <SelectValue placeholder="همه" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">همه</SelectItem>
+                  <SelectItem value="all">همه</SelectItem>
                   <SelectItem value="pending">در انتظار</SelectItem>
                   <SelectItem value="approved">تایید شده</SelectItem>
                   <SelectItem value="rejected">رد شده</SelectItem>
@@ -177,7 +177,7 @@ export function RequestList() {
                   <SelectValue placeholder="همه" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">همه</SelectItem>
+                  <SelectItem value="all">همه</SelectItem>
                   <SelectItem value="refund">استرداد بلیط</SelectItem>
                   <SelectItem value="payment">واریز وجه</SelectItem>
                 </SelectContent>
