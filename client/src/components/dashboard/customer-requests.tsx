@@ -65,12 +65,12 @@ function CustomerRequestDetail({ request, onClose }: CustomerRequestDetailProps)
   const [status, setStatus] = useState(request.status);
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
   const [sendSms, setSendSms] = useState(true);
-  
+
   // دریافت الگوهای پیامک
   const { data: templates = [] } = useQuery<SmsTemplate[]>({
     queryKey: ["/api/sms/templates"],
   });
-  
+
   const updateStatusMutation = useMutation({
     mutationFn: async (newStatus: string) => {
       const res = await apiRequest("PATCH", `/api/customer-requests/${request.id}/status`, { 
@@ -96,15 +96,15 @@ function CustomerRequestDetail({ request, onClose }: CustomerRequestDetailProps)
       });
     },
   });
-  
+
   const handleStatusChange = (value: string) => {
     setStatus(value);
   };
-  
+
   const handleSaveStatus = () => {
     updateStatusMutation.mutate(status);
   };
-  
+
   return (
     <DialogContent className="max-w-3xl">
       <DialogHeader>
@@ -113,46 +113,46 @@ function CustomerRequestDetail({ request, onClose }: CustomerRequestDetailProps)
           درخواست شماره {request.id} در تاریخ {format(new Date(request.createdAt), "yyyy/MM/dd HH:mm")} ثبت شده است
         </DialogDescription>
       </DialogHeader>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-4">
         <div className="space-y-2">
           <p className="text-sm font-medium">نام صاحب حساب:</p>
           <p className="text-sm text-gray-700">{request.accountOwner}</p>
         </div>
-        
+
         <div className="space-y-2">
           <p className="text-sm font-medium">شماره تماس:</p>
           <p className="text-sm text-gray-700">{request.phoneNumber}</p>
         </div>
-        
+
         <div className="space-y-2">
           <p className="text-sm font-medium">ایمیل:</p>
           <p className="text-sm text-gray-700">{request.email || "ندارد"}</p>
         </div>
-        
+
         <div className="space-y-2">
           <p className="text-sm font-medium">سایت خرید:</p>
           <p className="text-sm text-gray-700">{request.website}</p>
         </div>
-        
+
         <div className="space-y-2">
           <p className="text-sm font-medium">شماره شبا:</p>
           <p className="text-sm text-gray-700 font-mono">{request.ibanNumber}</p>
         </div>
-        
+
         <div className="space-y-2">
           <p className="text-sm font-medium">شماره واچر:</p>
           <p className="text-sm text-gray-700 font-mono">{request.voucherNumber}</p>
         </div>
-        
+
         <div className="space-y-2">
           <p className="text-sm font-medium">علت استرداد:</p>
           <p className="text-sm text-gray-700">{request.refundReason}</p>
         </div>
-        
+
         <div className="space-y-2">
           <p className="text-sm font-medium">وضعیت:</p>
-          <Select onValueChange={handleStatusChange} defaultValue={request.status}>
+          <Select onValueChange={handleStatusChange} defaultValue={request.status}> {/* Added defaultValue */}
             <SelectTrigger className="w-full">
               <SelectValue placeholder="انتخاب وضعیت" />
             </SelectTrigger>
@@ -164,7 +164,7 @@ function CustomerRequestDetail({ request, onClose }: CustomerRequestDetailProps)
           </Select>
         </div>
       </div>
-      
+
       <div className="grid grid-cols-1 gap-4 my-4">
         <div className="space-y-2">
           <div className="flex items-center space-x-2 space-x-reverse">
@@ -176,7 +176,7 @@ function CustomerRequestDetail({ request, onClose }: CustomerRequestDetailProps)
             <Label htmlFor="sendSms">ارسال پیامک به مشتری</Label>
           </div>
         </div>
-        
+
         {sendSms && (
           <div className="space-y-2">
             <Label htmlFor="smsTemplate" className="block text-sm font-medium">الگوی پیامک</Label>
@@ -196,12 +196,12 @@ function CustomerRequestDetail({ request, onClose }: CustomerRequestDetailProps)
           </div>
         )}
       </div>
-      
+
       <div className="col-span-2 space-y-2 mt-4">
         <p className="text-sm font-medium">توضیحات:</p>
         <p className="text-sm text-gray-700 p-3 bg-gray-50 rounded-md min-h-20">{request.description || "بدون توضیحات"}</p>
       </div>
-      
+
       <div className="flex justify-between items-center mt-4">
         <div>
           <Badge variant={request.contactedSupport ? "outline" : "destructive"} className={request.contactedSupport ? "bg-green-100 text-green-800" : ""}>
@@ -225,20 +225,20 @@ function CustomerRequestDetail({ request, onClose }: CustomerRequestDetailProps)
 // Main Customer Requests Component
 export function CustomerRequestsComponent() {
   const [selectedRequest, setSelectedRequest] = useState<CustomerRequest | null>(null);
-  
+
   const { data, isLoading, isError } = useQuery<CustomerRequest[]>({
     queryKey: ["/api/customer-requests"],
     staleTime: 1000 * 60, // 1 minute
   });
-  
+
   const handleViewDetail = (request: CustomerRequest) => {
     setSelectedRequest(request);
   };
-  
+
   const handleCloseDetail = () => {
     setSelectedRequest(null);
   };
-  
+
   if (isLoading) {
     return (
       <Card>
@@ -254,7 +254,7 @@ export function CustomerRequestsComponent() {
       </Card>
     );
   }
-  
+
   if (isError) {
     return (
       <Card>
@@ -270,7 +270,7 @@ export function CustomerRequestsComponent() {
       </Card>
     );
   }
-  
+
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -324,7 +324,7 @@ export function CustomerRequestsComponent() {
             )}
           </TableBody>
         </Table>
-        
+
         <Dialog open={selectedRequest !== null} onOpenChange={() => setSelectedRequest(null)}>
           {selectedRequest && (
             <CustomerRequestDetail
