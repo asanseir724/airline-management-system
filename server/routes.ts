@@ -8,6 +8,7 @@ import { ReportService } from "./services/report";
 import { generateTelegramMessage } from "./services/telegram-message";
 import { scrapeTourSource } from "./services/scraping";
 import { SkyroScraper } from "./services/skyro-scraper";
+import { ApiScraper } from "./services/api-scraper";
 import fileUpload, { UploadedFile } from "express-fileupload";
 
 // حذف تعریف interface چون با تایپ های express-fileupload تداخل دارد
@@ -1677,32 +1678,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "منبع تور یافت نشد" });
       }
       
-      // اسکرپ کردن منبع تور با استفاده از سرویس اسکرپینگ
-      const success = await scrapeTourSource(source);
+      // پارامتر اختیاری برای انتخاب روش اسکرپ (API یا ساده)
+      const useApi = req.body.useApi === true;
+      
+      let success = false;
+      
+      if (useApi) {
+        // استفاده از اسکرپر API به جای selenium
+        success = await ApiScraper.scrapeTourSource(source);
+      } else {
+        // استفاده از اسکرپر ساده
+        success = await scrapeTourSource(source);
+      }
       
       if (success) {
         // ثبت لاگ موفقیت
         await storage.createTourLog({
           level: "INFO",
-          message: `اسکرپ منبع "${source.name}" با موفقیت انجام شد`,
+          message: `اسکرپ منبع "${source.name}" با استفاده از ${useApi ? 'API' : 'اسکرپر ساده'} با موفقیت انجام شد`,
           content: source.url
         });
         
         res.json({ 
           success: true, 
-          message: "اسکرپ با موفقیت انجام شد" 
+          message: `اسکرپ با استفاده از ${useApi ? 'API' : 'اسکرپر ساده'} با موفقیت انجام شد` 
         });
       } else {
         // ثبت لاگ خطا
         await storage.createTourLog({
           level: "ERROR",
-          message: `خطا در اسکرپ منبع "${source.name}"`,
+          message: `خطا در اسکرپ منبع "${source.name}" با استفاده از ${useApi ? 'API' : 'اسکرپر ساده'}`,
           content: source.url
         });
         
         res.status(500).json({ 
           success: false, 
-          message: "خطا در اسکرپ منبع تور" 
+          message: `خطا در اسکرپ منبع تور با استفاده از ${useApi ? 'API' : 'اسکرپر ساده'}` 
         });
       }
     } catch (error) {

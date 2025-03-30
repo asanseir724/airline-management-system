@@ -138,15 +138,15 @@ export default function TourSources() {
 
   // Manual scrape mutation
   const scrapeMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const res = await apiRequest("POST", `/api/tour-sources/${id}/scrape`);
+    mutationFn: async (params: { id: number, useApi: boolean }) => {
+      const res = await apiRequest("POST", `/api/tour-sources/${params.id}/scrape`, { useApi: params.useApi });
       if (!res.ok) {
         const error = await res.text();
         throw new Error(error || "خطا در استخراج اطلاعات");
       }
       return await res.json();
     },
-    onSuccess: (_, id) => {
+    onSuccess: (_, params) => {
       queryClient.invalidateQueries({ queryKey: ["/api/tour-sources"] });
       queryClient.invalidateQueries({ queryKey: ["/api/tour-data"] });
       toast({
@@ -254,8 +254,26 @@ export default function TourSources() {
     deleteSourceMutation.mutate(id);
   };
 
+  // استفاده از dialog برای انتخاب نوع اسکرپ (API یا ساده)
+  const [isScrapeDialogOpen, setIsScrapeDialogOpen] = useState(false);
+  const [sourceToScrape, setSourceToScrape] = useState<number | null>(null);
+  const [useApiForScraping, setUseApiForScraping] = useState(true);
+
   const handleScrapeSource = (id: number) => {
-    scrapeMutation.mutate(id);
+    // باز کردن دیالوگ انتخاب نوع اسکرپ
+    setSourceToScrape(id);
+    setIsScrapeDialogOpen(true);
+  };
+  
+  const executeScrape = () => {
+    if (sourceToScrape === null) return;
+    
+    scrapeMutation.mutate({
+      id: sourceToScrape,
+      useApi: useApiForScraping
+    });
+    
+    setIsScrapeDialogOpen(false);
   };
 
   const prepareForEdit = (source: TourSource) => {
@@ -616,6 +634,51 @@ export default function TourSources() {
                 <Loader2 className="ml-2 h-4 w-4 animate-spin" />
               )}
               ذخیره تغییرات
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Scraping Method Dialog */}
+      <Dialog open={isScrapeDialogOpen} onOpenChange={setIsScrapeDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>انتخاب روش استخراج داده</DialogTitle>
+            <DialogDescription>
+              لطفا روش مورد نظر برای استخراج داده‌های تور را انتخاب کنید.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="flex items-center gap-3">
+              <Label htmlFor="use-api">استفاده از API (روش سریع)</Label>
+              <Switch 
+                id="use-api" 
+                checked={useApiForScraping} 
+                onCheckedChange={setUseApiForScraping} 
+              />
+            </div>
+            
+            <div className="text-sm text-muted-foreground">
+              {useApiForScraping ? 
+                "این روش از API های سایت منبع برای استخراج داده استفاده می‌کند و معمولاً سریع‌تر و بدون نیاز به مرورگر است." : 
+                "این روش از اسکرپر ساده استفاده می‌کند و برای منابعی که API ندارند مناسب است."
+              }
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsScrapeDialogOpen(false)}>
+              انصراف
+            </Button>
+            <Button 
+              onClick={executeScrape}
+              disabled={scrapeMutation.isPending}
+            >
+              {scrapeMutation.isPending && (
+                <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+              )}
+              شروع استخراج
             </Button>
           </DialogFooter>
         </DialogContent>
