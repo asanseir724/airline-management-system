@@ -5,7 +5,6 @@ import { SmsHistory } from '@shared/schema';
 
 dotenv.config();
 
-const AMOOTSMS_TOKEN = process.env.AMOOTSMS_TOKEN;
 const AMOOTSMS_API_URL = 'https://portal.amootsms.com/webservice2.asmx/SendWithBackupLine_REST';
 
 interface SmsResponse {
@@ -27,21 +26,39 @@ export class SmsService {
    */
   static async sendSms(phoneNumber: string, message: string, requestId?: number): Promise<SmsResponse> {
     try {
+      // دریافت تنظیمات پیامک از دیتابیس
+      const smsSettings = await storage.getSmsSettings();
+      
+      // اگر تنظیمات پیامک وجود ندارد یا غیرفعال است، ارسال پیامک انجام نمی‌شود
+      if (!smsSettings || !smsSettings.enabled) {
+        console.log('SMS is disabled or settings not found');
+        return {
+          status: false,
+          message: 'سرویس پیامک غیرفعال است یا تنظیمات یافت نشد',
+        };
+      }
+      
       // فرمت شماره موبایل
       const formattedPhoneNumber = this.formatPhoneNumber(phoneNumber);
+      
+      console.log('Sending SMS with token:', smsSettings.token);
+      console.log('Formatted phone number:', formattedPhoneNumber);
+      console.log('Message:', message);
       
       // ارسال درخواست به API
       const response = await axios.post(AMOOTSMS_API_URL, null, {
         params: {
-          UserName: 'amoot',
-          Password: '',
-          Token: AMOOTSMS_TOKEN,
+          UserName: smsSettings.username || 'amoot',
+          Password: smsSettings.password || '',
+          Token: smsSettings.token,
           Mobile: formattedPhoneNumber,
           Message: message,
-          Line: '980000000', // خط پیش‌فرض
-          BackupLine: '980000000', // خط پشتیبان
+          Line: smsSettings.defaultLine || '980000000', // خط پیش‌فرض
+          BackupLine: smsSettings.backupLine || '980000000', // خط پشتیبان
         },
       });
+
+      console.log('AmootSMS API response:', response.data);
 
       // پردازش پاسخ
       const result = response.data;
