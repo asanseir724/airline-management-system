@@ -218,13 +218,20 @@ export default function TourDataPage() {
   });
 
   const handleViewDetails = (tour: TourData) => {
-    // فرض کنیم که tour به عنوان ExtendedTourData است و اگر آنها undefined هستند، آرایه خالی قرار دهیم
+    // تبدیل داده‌های JSON به آرایه‌های تایپ شده با بررسی دقیق‌تر
     const extendedTour: ExtendedTourData = {
       ...tour,
-      services: tour.services as string[] || [],
-      hotels: tour.hotels as TourHotel[] || [],
-      requiredDocuments: tour.requiredDocuments as string[] || []
+      services: Array.isArray(tour.services) ? tour.services : 
+                typeof tour.services === 'object' ? Object.values(tour.services || {}) : [],
+      hotels: Array.isArray(tour.hotels) ? tour.hotels : 
+              typeof tour.hotels === 'object' ? Object.values(tour.hotels || {}) : [],
+      requiredDocuments: Array.isArray(tour.requiredDocuments) ? tour.requiredDocuments : 
+                         typeof tour.requiredDocuments === 'object' ? Object.values(tour.requiredDocuments || {}) : []
     };
+    
+    console.log("Tour data:", tour);
+    console.log("Extended tour:", extendedTour);
+    
     setSelectedTour(extendedTour);
     setIsDetailsOpen(true);
   };
