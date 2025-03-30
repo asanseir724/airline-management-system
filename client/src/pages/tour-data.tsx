@@ -21,6 +21,7 @@ export default function TourDataPage() {
   const [selectedTour, setSelectedTour] = useState<TourData | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [filter, setFilter] = useState("all");
+  const [sourceFilter, setSourceFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
 
   // Get tour data
@@ -236,6 +237,12 @@ export default function TourDataPage() {
     if (filter === "published" && !tour.isPublished) return false;
     if (filter === "unpublished" && tour.isPublished) return false;
     
+    // Filter by source (تور داخلی یا خارجی)
+    if (sourceFilter !== "all") {
+      const sourceId = parseInt(sourceFilter);
+      if (tour.sourceId !== sourceId) return false;
+    }
+    
     // Search term filter
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
@@ -275,16 +282,29 @@ export default function TourDataPage() {
               استخراج از SkyroTrip
             </Button>
             
-            <Select value={filter} onValueChange={setFilter}>
-              <SelectTrigger className="w-36">
-                <SelectValue placeholder="فیلتر وضعیت" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">همه</SelectItem>
-                <SelectItem value="published">منتشر شده</SelectItem>
-                <SelectItem value="unpublished">منتشر نشده</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex gap-2">
+              <Select value={filter} onValueChange={setFilter}>
+                <SelectTrigger className="w-36">
+                  <SelectValue placeholder="فیلتر وضعیت" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">همه</SelectItem>
+                  <SelectItem value="published">منتشر شده</SelectItem>
+                  <SelectItem value="unpublished">منتشر نشده</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                <SelectTrigger className="w-36">
+                  <SelectValue placeholder="نوع تور" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">همه تورها</SelectItem>
+                  <SelectItem value="1">تور داخلی</SelectItem>
+                  <SelectItem value="2">تور خارجی</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           
           <div className="w-full sm:w-64">
@@ -530,12 +550,12 @@ export default function TourDataPage() {
                     </div>
                     
                     {/* خدمات تور */}
-                    {selectedTour.services && Array.isArray(selectedTour.services) && selectedTour.services.length > 0 && (
+                    {selectedTour.services && Array.isArray(selectedTour.services) && (selectedTour.services as string[]).length > 0 && (
                       <div className="mb-4">
                         <div className="font-medium mb-2">خدمات تور:</div>
                         <div className="bg-gray-50 p-3 rounded-md">
                           <ul className="list-disc list-inside space-y-1">
-                            {selectedTour.services.map((service, index) => (
+                            {(selectedTour.services as string[]).map((service, index) => (
                               <li key={index}>{service}</li>
                             ))}
                           </ul>
@@ -544,11 +564,11 @@ export default function TourDataPage() {
                     )}
 
                     {/* هتل‌های تور */}
-                    {selectedTour.hotels && Array.isArray(selectedTour.hotels) && selectedTour.hotels.length > 0 && (
+                    {selectedTour.hotels && Array.isArray(selectedTour.hotels) && (selectedTour.hotels as any[]).length > 0 && (
                       <div className="mb-4">
                         <div className="font-medium mb-2">هتل‌های تور:</div>
                         <div className="bg-gray-50 p-3 rounded-md">
-                          {selectedTour.hotels.map((hotel, index) => (
+                          {(selectedTour.hotels as any[]).map((hotel, index) => (
                             <div key={index} className="mb-3 pb-3 border-b border-gray-200 last:border-0">
                               <div className="flex justify-between items-center mb-1">
                                 <span className="font-semibold">{hotel.name}</span>
@@ -576,12 +596,12 @@ export default function TourDataPage() {
                     )}
 
                     {/* مدارک مورد نیاز */}
-                    {selectedTour.requiredDocuments && Array.isArray(selectedTour.requiredDocuments) && selectedTour.requiredDocuments.length > 0 && (
+                    {selectedTour.requiredDocuments && Array.isArray(selectedTour.requiredDocuments) && (selectedTour.requiredDocuments as string[]).length > 0 && (
                       <div className="mb-4">
                         <div className="font-medium mb-2">مدارک مورد نیاز:</div>
                         <div className="bg-gray-50 p-3 rounded-md">
                           <ul className="list-disc list-inside space-y-1">
-                            {selectedTour.requiredDocuments.map((doc, index) => (
+                            {(selectedTour.requiredDocuments as string[]).map((doc, index) => (
                               <li key={index}>{doc}</li>
                             ))}
                           </ul>
