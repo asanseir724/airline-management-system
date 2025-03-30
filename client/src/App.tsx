@@ -26,7 +26,7 @@ function Router() {
       <ProtectedRoute path="/backup" component={Backup} />
       <ProtectedRoute path="/system-management" component={SystemManagement} />
       <Route path="/auth" component={AuthPage} />
-      <Route path="/customer-request" component={CustomerRequestForm} />
+      <Route path="/customer-request-form" component={CustomerRequestForm} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -40,7 +40,8 @@ export interface IStorage {
   // Customer Request methods
   getCustomerRequests(): Promise<CustomerRequest[]>;
   getCustomerRequestById(id: number): Promise<CustomerRequest | undefined>;
-  createCustomerRequest(request: InsertCustomerRequest): Promise<CustomerRequest>;
+  getCustomerRequestByVoucherNumber(voucherNumber: string): Promise<CustomerRequest | undefined>;
+  createCustomerRequest(request: InsertCustomerRequest & { trackingCode: string }): Promise<CustomerRequest>;
   updateCustomerRequestStatus(id: number, status: string): Promise<CustomerRequest | undefined>;
   
   // SMS Template methods
@@ -233,7 +234,14 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
   
-  async createCustomerRequest(insertRequest: InsertCustomerRequest): Promise<CustomerRequest> {
+  async getCustomerRequestByVoucherNumber(voucherNumber: string): Promise<CustomerRequest | undefined> {
+    const result = await this.db.select().from(schema.customerRequests)
+      .where(eq(schema.customerRequests.voucherNumber, voucherNumber))
+      .limit(1);
+    return result[0];
+  }
+  
+  async createCustomerRequest(insertRequest: InsertCustomerRequest & { trackingCode: string }): Promise<CustomerRequest> {
     const result = await this.db.insert(schema.customerRequests).values({
       email: insertRequest.email || null,
       website: insertRequest.website,
@@ -244,7 +252,8 @@ export class DatabaseStorage implements IStorage {
       accountOwner: insertRequest.accountOwner,
       description: insertRequest.description || null,
       contactedSupport: insertRequest.contactedSupport || false,
-      acceptTerms: insertRequest.acceptTerms || false
+      acceptTerms: insertRequest.acceptTerms || false,
+      trackingCode: insertRequest.trackingCode
     }).returning();
     
     return result[0];

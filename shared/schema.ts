@@ -219,7 +219,7 @@ export const customerRequests = pgTable("customer_requests", {
   email: text("email"),
   website: text("website").notNull(),
   refundReason: text("refund_reason").notNull(),
-  voucherNumber: text("voucher_number").notNull(),
+  voucherNumber: text("voucher_number").notNull().unique(), // افزودن unique constraint برای جلوگیری از تکرار
   phoneNumber: text("phone_number").notNull(),
   ibanNumber: text("iban_number").notNull(),
   accountOwner: text("account_owner").notNull(),
@@ -227,6 +227,7 @@ export const customerRequests = pgTable("customer_requests", {
   contactedSupport: boolean("contacted_support").notNull().default(false),
   acceptTerms: boolean("accept_terms").notNull().default(false),
   status: text("status").notNull().default("pending"),
+  trackingCode: text("tracking_code").notNull(), // کد پیگیری
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

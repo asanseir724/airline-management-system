@@ -353,6 +353,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // تابع تولید کد پیگیری تصادفی
+  function generateTrackingCode() {
+    // ایجاد یک کد 8 رقمی تصادفی
+    const min = 10000000;
+    const max = 99999999;
+    return Math.floor(Math.random() * (max - min + 1) + min).toString();
+  }
+
+  // بررسی تکراری بودن شماره واچر
+  app.get("/api/check-voucher/:voucherNumber", async (req, res, next) => {
+    try {
+      const voucherNumber = req.params.voucherNumber;
+      const existingRequest = await storage.getCustomerRequestByVoucherNumber(voucherNumber);
+      
+      if (existingRequest) {
+        return res.status(409).json({ 
+          exists: true, 
+          message: "این شماره واچر قبلاً ثبت شده است" 
+        });
+      }
+      
+      return res.status(200).json({ exists: false });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Customer Request routes
   app.post("/api/customer-requests", async (req, res, next) => {
     try {
@@ -361,7 +388,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "اطلاعات درخواست معتبر نیست", errors: validation.error.errors });
       }
       
-      const request = await storage.createCustomerRequest(validation.data);
+      // بررسی تکراری بودن شماره واچر
+      const existingRequest = await storage.getCustomerRequestByVoucherNumber(validation.data.voucherNumber);
+      if (existingRequest) {
+        return res.status(409).json({ 
+          message: "این شماره واچر قبلاً ثبت شده است" 
+        });
+      }
+      
+      // تولید کد پیگیری
+      const trackingCode = generateTrackingCode();
+      
+      // ایجاد درخواست با کد پیگیری
+      const requestData = {
+        ...validation.data,
+        trackingCode
+      };
+      
+      const request = await storage.createCustomerRequest(requestData);
       
       // If there's a telegram config, simulate sending to telegram
       const telegramConfig = await storage.getTelegramConfig();
@@ -379,8 +423,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const pendingTemplate = smsTemplates.find(t => t.name === "در حال بررسی");
       if (pendingTemplate) {
         try {
+          // افزودن کد پیگیری به متن پیامک
+          const messageWithTracking = pendingTemplate.content + `\n\nکد پیگیری شما: ${trackingCode}`;
+          
           // ارسال پیامک از طریق سرویس AmootSMS
-          await SmsService.sendSms(request.phoneNumber, pendingTemplate.content, request.id);
+          await SmsService.sendSms(request.phoneNumber, messageWithTracking, request.id);
         } catch (smsError) {
           console.error('Error sending confirmation SMS:', smsError);
           // در صورت خطا، فقط لاگ می‌کنیم و اجازه می‌دهیم درخواست ادامه یابد

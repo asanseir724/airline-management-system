@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -27,7 +27,8 @@ import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { AirlineLogo } from "@/components/icons/airline-logo";
-import { Upload, CheckCircle2 } from "lucide-react";
+import { Upload, CheckCircle2, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 // Schema for the request form
 const requestFormSchema = z.object({
@@ -54,6 +55,9 @@ type RequestFormValues = z.infer<typeof requestFormSchema>;
 export default function CustomerRequestForm() {
   const { toast } = useToast();
   const [isSubmitSuccess, setIsSubmitSuccess] = useState(false);
+  const [trackingCode, setTrackingCode] = useState<string>("");
+  const [vouicherError, setVoucherError] = useState<string | null>(null);
+  const [checkingVoucher, setCheckingVoucher] = useState(false);
   
   const form = useForm<RequestFormValues>({
     resolver: zodResolver(requestFormSchema),
@@ -71,9 +75,56 @@ export default function CustomerRequestForm() {
     },
   });
 
+  // بررسی تکراری بودن شماره واچر
+  const checkVoucherNumber = async (voucherNumber: string) => {
+    try {
+      setCheckingVoucher(true);
+      setVoucherError(null);
+      const response = await fetch(`/api/check-voucher/${voucherNumber}`);
+      const data = await response.json();
+      
+      if (response.status === 409 || data.exists) {
+        setVoucherError("این شماره واچر قبلاً ثبت شده است");
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error("Error checking voucher:", error);
+      return true; // در صورت خطا، اجازه می‌دهیم کاربر ادامه دهد
+    } finally {
+      setCheckingVoucher(false);
+    }
+  };
+
+  // بررسی شماره واچر هنگام تغییر
+  useEffect(() => {
+    const voucherNumber = form.watch("voucherNumber");
+    const debounceTimeout = setTimeout(() => {
+      if (voucherNumber && voucherNumber.length > 3) {
+        checkVoucherNumber(voucherNumber);
+      }
+    }, 500);
+    
+    return () => clearTimeout(debounceTimeout);
+  }, [form.watch("voucherNumber")]);
+
   const submitRequest = useMutation({
-    mutationFn: (values: RequestFormValues) => 
-      apiRequest("POST", "/api/customer-requests", values),
+    mutationFn: async (values: RequestFormValues) => {
+      // بررسی مجدد قبل از ارسال
+      const isValid = await checkVoucherNumber(values.voucherNumber);
+      if (!isValid) {
+        throw new Error("این شماره واچر قبلاً ثبت شده است");
+      }
+      
+      const response = await apiRequest("POST", "/api/customer-requests", values);
+      const data = await response.json();
+      if (data.trackingCode) {
+        setTrackingCode(data.trackingCode);
+      } else {
+        setTrackingCode(Math.floor(Math.random() * 10000000 + 10000000).toString());
+      }
+      return data;
+    },
     onSuccess: () => {
       toast({
         title: "درخواست با موفقیت ثبت شد",
@@ -92,6 +143,14 @@ export default function CustomerRequestForm() {
   });
 
   const onSubmit = (data: RequestFormValues) => {
+    if (vouicherError) {
+      toast({
+        title: "خطای اعتبارسنجی",
+        description: vouicherError,
+        variant: "destructive",
+      });
+      return;
+    }
     submitRequest.mutate(data);
   };
 
@@ -117,7 +176,7 @@ export default function CustomerRequestForm() {
               <p className="text-gray-600 mb-6">
                 در صورت نیاز به پیگیری، شماره پیگیری خود را یادداشت کنید:
                 <span className="font-bold block mt-2 text-lg">
-                  {Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}
+                  {trackingCode}
                 </span>
               </p>
               <Button onClick={() => setIsSubmitSuccess(false)}>
@@ -238,6 +297,20 @@ export default function CustomerRequestForm() {
                       <FormDescription className="text-xs">
                         شماره واچر پرواز در پیامکی که از طرف سایت برای شما هنگام خرید ارسال شده است موجود می‌باشد.
                       </FormDescription>
+                      {vouicherError && (
+                        <Alert variant="destructive" className="mt-2">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertTitle className="text-xs font-medium">خطا</AlertTitle>
+                          <AlertDescription className="text-xs">
+                            {vouicherError}
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                      {checkingVoucher && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          در حال بررسی شماره واچر...
+                        </p>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}
