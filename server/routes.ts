@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { SmsService } from "./services/sms";
 import { TelegramService } from "./services/telegram";
+import { ReportService } from "./services/report";
 import { 
   insertRequestSchema, 
   insertSmsTemplateSchema, 
@@ -394,6 +395,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json(settings);
     } catch (error) {
+      next(error);
+    }
+  });
+  
+  // API برای ارسال گزارش آماری به کانال تلگرام
+  app.post("/api/reports/send", isAuthenticated, async (req, res, next) => {
+    try {
+      const success = await ReportService.sendReportToTelegram();
+      
+      if (success) {
+        res.status(200).json({
+          success: true,
+          message: "گزارش آماری با موفقیت به کانال تلگرام ارسال شد"
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          message: "خطا در ارسال گزارش آماری به تلگرام"
+        });
+      }
+    } catch (error) {
+      console.error('Error sending report to Telegram:', error);
       next(error);
     }
   });
