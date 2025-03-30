@@ -106,15 +106,8 @@ export default function Dashboard() {
         />
       </div>
 
+      {/* بخش کارت‌های تور غیرفعال شده است */}
       
-              icon={<Map className="h-5 w-5 text-cyan-500" />}
-              color="cyan-500"
-              onClick={() => handleTourView("/tour-destinations")}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
       <div className="grid grid-cols-1 gap-8 mb-8">
         <RecentRequests />
         <CustomerRequestsComponent />
