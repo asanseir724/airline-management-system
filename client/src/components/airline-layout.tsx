@@ -14,6 +14,7 @@ import {
   Bell,
   LogOut,
   User,
+  Settings,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -77,6 +78,11 @@ export function AirlineLayout({ children, title, subtitle }: AirlineLayoutProps)
       title: "بک‌آپ‌گیری",
       href: "/backup",
       icon: <Database className="h-5 w-5 ml-3" />,
+    },
+    {
+      title: "مدیریت سیستم",
+      href: "/system-management",
+      icon: <Settings className="h-5 w-5 ml-3" />,
     },
   ];
 

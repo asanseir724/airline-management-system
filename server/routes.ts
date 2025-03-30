@@ -9,7 +9,9 @@ import {
   insertSmsHistorySchema,
   insertTelegramConfigSchema,
   insertBackupSettingsSchema,
-  insertCustomerRequestSchema
+  insertCustomerRequestSchema,
+  insertSystemLogSchema,
+  insertSmsSettingsSchema
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -397,6 +399,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       res.json(request);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // تنظیمات پیامک
+  app.get("/api/sms/settings", isAuthenticated, async (req, res, next) => {
+    try {
+      const settings = await storage.getSmsSettings();
+      res.json(settings || {});
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.post("/api/sms/settings", isAuthenticated, async (req, res, next) => {
+    try {
+      const validation = insertSmsSettingsSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "اطلاعات تنظیمات پیامک معتبر نیست", 
+          errors: validation.error.errors 
+        });
+      }
+      
+      // ابتدا چک می‌کنیم آیا تنظیمات وجود دارد
+      const existingSettings = await storage.getSmsSettings();
+      let settings;
+      
+      if (existingSettings) {
+        // به‌روزرسانی تنظیمات موجود
+        settings = await storage.updateSmsSettings(existingSettings.id, validation.data);
+      } else {
+        // ایجاد تنظیمات جدید
+        settings = await storage.createSmsSettings(validation.data);
+      }
+      
+      res.status(201).json(settings);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  // مسیرهای مدیریت لاگ‌های سیستم
+  app.get("/api/system-logs", isAuthenticated, async (req, res, next) => {
+    try {
+      const logs = await storage.getSystemLogs();
+      res.json(logs);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.post("/api/system-logs", isAuthenticated, async (req, res, next) => {
+    try {
+      const validation = insertSystemLogSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "اطلاعات لاگ معتبر نیست", 
+          errors: validation.error.errors 
+        });
+      }
+      
+      const log = await storage.createSystemLog(validation.data);
+      res.status(201).json(log);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.delete("/api/system-logs/:id", isAuthenticated, async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.deleteSystemLog(id);
+      if (!success) {
+        return res.status(404).json({ message: "لاگ مورد نظر یافت نشد" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.delete("/api/system-logs", isAuthenticated, async (req, res, next) => {
+    try {
+      const success = await storage.clearSystemLogs();
+      if (!success) {
+        return res.status(500).json({ message: "خطا در پاک کردن لاگ‌ها" });
+      }
+      res.status(204).send();
     } catch (error) {
       next(error);
     }

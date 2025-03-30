@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, pgEnum, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -165,6 +165,53 @@ export type InsertBackupHistory = z.infer<typeof insertBackupHistorySchema>;
 
 export type BackupSettings = typeof backupSettings.$inferSelect;
 export type InsertBackupSettings = z.infer<typeof insertBackupSettingsSchema>;
+
+// تنظیمات پیامک
+export const smsSettings = pgTable("sms_settings", {
+  id: serial("id").primaryKey(),
+  token: text("token").notNull(),
+  defaultLine: text("default_line").default("980000000"),
+  backupLine: text("backup_line").default("980000000"),
+  username: text("username").default(""),
+  password: text("password").default(""),
+  enabled: boolean("enabled").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSmsSettingsSchema = createInsertSchema(smsSettings).pick({
+  token: true,
+  defaultLine: true,
+  backupLine: true,
+  username: true,
+  password: true,
+  enabled: true,
+});
+
+export type SmsSettings = typeof smsSettings.$inferSelect;
+export type InsertSmsSettings = z.infer<typeof insertSmsSettingsSchema>;
+
+// لاگ سیستم
+export const systemLogs = pgTable("system_logs", {
+  id: serial("id").primaryKey(),
+  level: text("level").notNull(), // error, warn, info, debug
+  message: text("message").notNull(),
+  module: text("module"), // مدول/بخش برنامه که لاگ مربوط به آن است
+  details: jsonb("details"), // جزئیات بیشتر به صورت JSON
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSystemLogSchema = createInsertSchema(systemLogs, {
+  details: z.record(z.string(), z.any()).optional(),
+}).pick({
+  level: true,
+  message: true,
+  module: true,
+  details: true,
+});
+
+export type SystemLog = typeof systemLogs.$inferSelect;
+export type InsertSystemLog = z.infer<typeof insertSystemLogSchema>;
 
 // CustomerRequest Schema
 export const customerRequests = pgTable("customer_requests", {
