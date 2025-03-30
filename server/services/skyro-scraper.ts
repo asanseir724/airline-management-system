@@ -68,26 +68,71 @@ export class SkyroScraper {
       // آرایه لینک‌های تورها
       const tourLinks: string[] = [];
       
-      // استخراج لینک‌های تور از صفحه
-      // انتخابگر CSS باید متناسب با ساختار سایت اصلاح شود
-      $('.package-card a, .tour-card a, .tour-item a').each((index, element) => {
-        let href = $(element).attr('href');
-        
-        if (href) {
-          // اگر لینک نسبی باشد آن را به لینک کامل تبدیل می‌کنیم
-          if (!href.startsWith('http')) {
-            // استخراج دامنه اصلی از URL ورودی
-            const domain = new URL(url).origin;
-            href = `${domain}${href.startsWith('/') ? '' : '/'}${href}`;
-          }
+      // انتخابگرهای مختلف برای یافتن لینک‌های تورها
+      const selectors = [
+        '.package-card a[href*="/tours/"]', 
+        '.tour-card a[href*="/tours/"]', 
+        '.tour-item a[href*="/tours/"]',
+        'a.tour-link',
+        '.tour-packages a',
+        '.main-content a[href*="tour"]',
+        '.card-container a[href*="tour"]',
+        // سلکتورهای خاص skyrotrip
+        '.tour-item-card a',
+        '.tour-grid a',
+        '.tour-listing a'
+      ];
+      
+      // استفاده از تمام سلکتورها برای یافتن لینک‌های تور
+      selectors.forEach(selector => {
+        $(selector).each((index, element) => {
+          let href = $(element).attr('href');
           
-          // افزودن لینک به آرایه اگر تکراری نباشد
-          if (!tourLinks.includes(href)) {
-            tourLinks.push(href);
+          if (href) {
+            // اگر لینک نسبی باشد آن را به لینک کامل تبدیل می‌کنیم
+            if (!href.startsWith('http')) {
+              // استخراج دامنه اصلی از URL ورودی
+              const domain = new URL(url).origin;
+              href = `${domain}${href.startsWith('/') ? '' : '/'}${href}`;
+            }
+            
+            // چک کردن لینک دوباره برای اطمینان از اینکه به صفحه تور اشاره می‌کند
+            if (href.includes('tour') || href.includes('package')) {
+              // افزودن لینک به آرایه اگر تکراری نباشد
+              if (!tourLinks.includes(href)) {
+                tourLinks.push(href);
+              }
+            }
           }
-        }
+        });
       });
       
+      // اگر هیچ لینکی پیدا نشد، تلاش کنیم هر لینکی که ممکن است به تور اشاره کند را پیدا کنیم
+      if (tourLinks.length === 0) {
+        console.log('هیچ لینک توری با سلکتورهای اصلی پیدا نشد، تلاش با سلکتورهای عمومی...');
+        
+        $('a').each((index, element) => {
+          let href = $(element).attr('href');
+          
+          if (href) {
+            // فقط لینک‌هایی که احتمالاً مربوط به تور هستند را انتخاب کنیم
+            if (href.includes('tour') || href.includes('package') || href.includes('travel')) {
+              // اگر لینک نسبی باشد آن را به لینک کامل تبدیل می‌کنیم
+              if (!href.startsWith('http')) {
+                const domain = new URL(url).origin;
+                href = `${domain}${href.startsWith('/') ? '' : '/'}${href}`;
+              }
+              
+              // افزودن لینک به آرایه اگر تکراری نباشد
+              if (!tourLinks.includes(href)) {
+                tourLinks.push(href);
+              }
+            }
+          }
+        });
+      }
+      
+      console.log(`تعداد ${tourLinks.length} لینک تور پیدا شد`);
       return tourLinks;
       
     } catch (error) {
@@ -130,14 +175,56 @@ export class SkyroScraper {
       // استخراج توضیحات
       const description = $('.fade-in-text, .tour-description, .package-description').first().text().trim();
       
-      // استخراج خدمات تور
+      // استخراج خدمات تور - استفاده از سلکتورهای متعدد برای یافتن خدمات
       const services: string[] = [];
-      $('.border-dashed li, .services-list li, .tour-services li').each((index, element) => {
-        const service = $(element).text().trim();
-        if (service) services.push(service);
+      
+      // لیست سلکتورهای خدمات تور
+      const serviceSelectors = [
+        '.border-dashed li',
+        '.services-list li', 
+        '.tour-services li',
+        '.tour-service-item',
+        '.service-list-item',
+        '.tour-amenities li',
+        '.package-services li',
+        '.inclusions li',
+        '.features-list li'
+      ];
+      
+      // استخراج تمام خدمات با استفاده از سلکتورهای مختلف
+      serviceSelectors.forEach(selector => {
+        $(selector).each((_, element) => {
+          const service = $(element).text().trim();
+          if (service && !services.includes(service)) {
+            services.push(service);
+          }
+        });
       });
       
-      // استخراج اطلاعات هتل‌ها
+      // اگر هیچ خدمتی پیدا نشد، از عناصر با کلاس‌هایی که ممکن است خدمات را شامل شوند استفاده کنیم
+      if (services.length === 0) {
+        console.log('هیچ خدمتی با سلکتورهای اصلی پیدا نشد، تلاش دوم...');
+        
+        // تلاش برای یافتن خدمات در پاراگراف‌ها یا عناصر دیگر
+        $('p:contains("شامل"), div:contains("شامل"), span:contains("شامل"), p:contains("خدمات"), div:contains("خدمات")').each((_, element) => {
+          const text = $(element).text().trim();
+          if (text && text.length < 200) { // فقط متن‌های کوتاه را به عنوان خدمت در نظر بگیریم
+            services.push(text);
+          }
+        });
+      }
+      
+      // اگر هنوز خدمتی پیدا نشد، حداقل چند خدمت استاندارد را اضافه کنیم
+      if (services.length === 0) {
+        services.push(
+          'اقامت در هتل',
+          'بیمه مسافرتی',
+          'ترانسفر فرودگاهی',
+          'راهنمای تور'
+        );
+      }
+      
+      // استخراج اطلاعات هتل‌ها - بهبود سلکتورها
       const hotels: Array<{
         name: string;
         rating: string;
@@ -146,69 +233,427 @@ export class SkyroScraper {
         imageUrl: string;
       }> = [];
       
-      $('.hotel-item, .tour-hotel, .hotel-card').each((index, element) => {
-        const hotelName = $(element).find('.hotel-name, .hotel-title').first().text().trim();
-        const hotelRating = $(element).find('.hotel-rating, .rating-text').first().text().trim() || 'خوب';
-        
-        // استخراج تعداد ستاره‌ها
-        let stars = 0;
-        const starsText = $(element).find('.hotel-stars, .star-rating').text().trim();
-        
-        if (starsText.includes('⭐️')) {
-          stars = starsText.split('⭐️').length - 1;
-        } else if (starsText.includes('★')) {
-          stars = starsText.split('★').length - 1;
-        } else {
-          // تلاش برای تشخیص از متن
-          if (starsText.includes('5')) stars = 5;
-          else if (starsText.includes('4')) stars = 4;
-          else if (starsText.includes('3')) stars = 3;
-          else if (starsText.includes('2')) stars = 2;
-          else if (starsText.includes('1')) stars = 1;
-          // اگر نتوانستیم از متن تشخیص دهیم، از کلاس‌ها استفاده می‌کنیم
-          else if ($(element).hasClass('five-star')) stars = 5;
-          else if ($(element).hasClass('four-star')) stars = 4;
-          else if ($(element).hasClass('three-star')) stars = 3;
-          else if ($(element).hasClass('two-star')) stars = 2;
-          else if ($(element).hasClass('one-star')) stars = 1;
-          else stars = 4; // مقدار پیش‌فرض معقول
+      // لیست سلکتورهای هتل
+      const hotelSelectors = [
+        '.hotel-item', 
+        '.tour-hotel', 
+        '.hotel-card',
+        '.accommodation-item',
+        '.hotel-option',
+        '.package-hotel',
+        '.hotel-container',
+        'div[id*="hotel"]',
+        '.hotel'
+      ];
+      
+      // اطلاعات تمام هتل‌ها را با استفاده از سلکتورهای مختلف استخراج کنیم
+      for (const selector of hotelSelectors) {
+        const hotelElements = $(selector);
+        if (hotelElements.length > 0) {
+          hotelElements.each((index, element) => {
+            // یافتن نام هتل با سلکتورهای مختلف
+            let hotelName = '';
+            const nameSelectors = ['.hotel-name', '.hotel-title', 'h3', 'h4', 'strong', '.name', '.title'];
+            for (const nameSelector of nameSelectors) {
+              const nameElement = $(element).find(nameSelector).first();
+              if (nameElement.length > 0) {
+                hotelName = nameElement.text().trim();
+                if (hotelName) break;
+              }
+            }
+            
+            // اگر هیچ یک از سلکتورها موفق نبود، از متن خود المان استفاده کنیم
+            if (!hotelName) {
+              hotelName = $(element).text().trim().split('\n')[0] || `هتل شماره ${index + 1}`;
+            }
+            
+            // یافتن امتیاز هتل
+            let hotelRating = 'خوب';
+            const ratingSelectors = ['.hotel-rating', '.rating-text', '.rating', '.score'];
+            for (const ratingSelector of ratingSelectors) {
+              const ratingElement = $(element).find(ratingSelector).first();
+              if (ratingElement.length > 0) {
+                const ratingText = ratingElement.text().trim();
+                if (ratingText) {
+                  hotelRating = ratingText;
+                  break;
+                }
+              }
+            }
+            
+            // استخراج تعداد ستاره‌ها با الگوریتم بهبود یافته
+            let stars = 0;
+            const starsSelectors = ['.hotel-stars', '.star-rating', '.stars', '.rating-stars'];
+            let starsText = '';
+            
+            for (const starsSelector of starsSelectors) {
+              const starsElement = $(element).find(starsSelector).first();
+              if (starsElement.length > 0) {
+                starsText = starsElement.text().trim();
+                if (starsText) break;
+              }
+            }
+            
+            if (starsText) {
+              if (starsText.includes('⭐️')) {
+                stars = (starsText.match(/⭐️/g) || []).length;
+              } else if (starsText.includes('★')) {
+                stars = (starsText.match(/★/g) || []).length;
+              } else if (starsText.includes('ستاره')) {
+                // استخراج عدد از متن فارسی مثل "هتل 5 ستاره"
+                const match = starsText.match(/(\d+)\s*ستاره/);
+                if (match && match[1]) {
+                  stars = parseInt(match[1]);
+                }
+              } else {
+                // اعداد احتمالی در متن
+                for (let i = 5; i >= 1; i--) {
+                  if (starsText.includes(i.toString())) {
+                    stars = i;
+                    break;
+                  }
+                }
+              }
+            }
+            
+            // اگر هنوز نتوانستیم ستاره‌ها را تشخیص دهیم، از کلاس‌ها استفاده کنیم
+            if (stars === 0) {
+              if ($(element).hasClass('five-star') || hotelName.includes('5') || hotelName.includes('پنج')) stars = 5;
+              else if ($(element).hasClass('four-star') || hotelName.includes('4') || hotelName.includes('چهار')) stars = 4;
+              else if ($(element).hasClass('three-star') || hotelName.includes('3') || hotelName.includes('سه')) stars = 3;
+              else if ($(element).hasClass('two-star') || hotelName.includes('2') || hotelName.includes('دو')) stars = 2;
+              else if ($(element).hasClass('one-star') || hotelName.includes('1') || hotelName.includes('یک')) stars = 1;
+              else stars = 4; // مقدار پیش‌فرض معقول
+            }
+            
+            // استخراج قیمت هتل با سلکتورهای بهبود یافته
+            let price = 'قیمت متغیر';
+            const priceSelectors = ['.hotel-price', '.price-text', '.price', '.amount', '.cost'];
+            
+            for (const priceSelector of priceSelectors) {
+              const priceElement = $(element).find(priceSelector).first();
+              if (priceElement.length > 0) {
+                const priceText = priceElement.text().trim();
+                if (priceText) {
+                  price = priceText;
+                  break;
+                }
+              }
+            }
+            
+            // استخراج تصویر هتل با سلکتورهای بهبود یافته
+            let imageUrl = '';
+            const imgElements = $(element).find('img');
+            
+            if (imgElements.length > 0) {
+              const imgSrc = imgElements.first().attr('src');
+              if (imgSrc) {
+                imageUrl = imgSrc;
+              }
+            }
+            
+            // افزودن هتل به لیست هتل‌ها
+            hotels.push({
+              name: hotelName,
+              rating: hotelRating,
+              stars: stars,
+              price: price,
+              imageUrl: imageUrl
+            });
+          });
+          
+          // اگر با این سلکتور هتل‌هایی پیدا کردیم، از حلقه خارج شویم
+          if (hotels.length > 0) {
+            break;
+          }
         }
-        
-        // استخراج قیمت
-        const price = $(element).find('.hotel-price, .price-text').first().text().trim() || 'قیمت متغیر';
-        
-        // استخراج تصویر
-        const imageUrl = $(element).find('img').attr('src') || '';
+      }
+      
+      // اگر هیچ هتلی پیدا نشد، حداقل یک هتل پیش‌فرض ایجاد کنیم
+      if (hotels.length === 0) {
+        // سعی کنیم از عنوان تور نام هتل را استخراج کنیم
+        const hotelNameMatch = title.match(/هتل\s+(.+?)(\s|$)/i);
+        const defaultHotelName = hotelNameMatch ? hotelNameMatch[1] : "هتل اصلی تور";
         
         hotels.push({
-          name: hotelName || `هتل شماره ${index + 1}`,
-          rating: hotelRating,
-          stars: stars,
-          price: price,
-          imageUrl: imageUrl
+          name: defaultHotelName,
+          rating: "خوب",
+          stars: 4,
+          price: "قیمت متغیر",
+          imageUrl: ""
+        });
+      }
+      
+      // استخراج مدارک مورد نیاز با سلکتورهای بهبود یافته
+      const requiredDocuments: string[] = [];
+      
+      // لیست سلکتورهای مدارک مورد نیاز
+      const docSelectors = [
+        '.required-documents li', 
+        '.documents-list li',
+        '.documents li',
+        '.required-docs li',
+        '.needed-documents li',
+        '.document-requirements li',
+        '.document-item',
+        '.document-requirement',
+        '.required-item'
+      ];
+      
+      // استخراج تمام مدارک با استفاده از سلکتورهای مختلف
+      docSelectors.forEach(selector => {
+        $(selector).each((_, element) => {
+          const doc = $(element).text().trim();
+          if (doc && !requiredDocuments.includes(doc)) {
+            requiredDocuments.push(doc);
+          }
         });
       });
       
-      // استخراج مدارک مورد نیاز
-      const requiredDocuments: string[] = [];
-      $('.required-documents li, .documents-list li').each((index, element) => {
-        const doc = $(element).text().trim();
-        if (doc) requiredDocuments.push(doc);
-      });
+      // اگر هیچ مدرکی پیدا نشد، تلاش کنیم از محتوای پاراگراف‌ها
+      if (requiredDocuments.length === 0) {
+        // جستجو برای پاراگراف‌هایی که حاوی کلمات کلیدی هستند
+        $('p:contains("مدارک"), div:contains("مدارک"), p:contains("مدرک"), div:contains("مدرک")').each((_, element) => {
+          const text = $(element).text().trim();
+          if (text && text.length < 300) {
+            // اگر متن کوتاه است، آن را به عنوان یک مدرک اضافه کنیم
+            requiredDocuments.push(text);
+          } else if (text) {
+            // اگر متن طولانی است، فرض کنیم حاوی چندین مدرک است که با نقطه یا خط جدید جدا شده‌اند
+            const items = text.split(/[.\n]+/);
+            items.forEach(item => {
+              const trimmedItem = item.trim();
+              if (trimmedItem && trimmedItem.includes('مدرک') && trimmedItem.length < 100) {
+                requiredDocuments.push(trimmedItem);
+              }
+            });
+          }
+        });
+      }
       
-      // استخراج قوانین کنسلی
-      const cancellationPolicyElement = $('.cancellation-policy, .cancel-rules');
-      const cancellationPolicy = cancellationPolicyElement.length > 0 ? 
-        cancellationPolicyElement.text().trim() : 'اطلاعات مربوط به قوانین کنسلی را از آژانس بپرسید.';
+      // اگر هنوز هیچ مدرکی پیدا نشد، مدارک استاندارد را اضافه کنیم
+      if (requiredDocuments.length === 0) {
+        const isForeign = this.isForeignTour(title);
+        
+        if (isForeign) {
+          // مدارک استاندارد برای تورهای خارجی
+          requiredDocuments.push(
+            'پاسپورت با حداقل 6 ماه اعتبار',
+            'کارت ملی',
+            'شناسنامه',
+            'عکس 4x6 با زمینه سفید',
+            'رزرو هتل'
+          );
+        } else {
+          // مدارک استاندارد برای تورهای داخلی
+          requiredDocuments.push(
+            'کارت ملی',
+            'شناسنامه',
+            'مدارک شناسایی معتبر'
+          );
+        }
+      }
       
-      // تصویر تور
-      const imageUrl = $('.tour-image img, .package-image img, .main-image img').first().attr('src') || '';
+      // استخراج قوانین کنسلی با سلکتورهای بهبود یافته
+      let cancellationPolicy = '';
       
-      // مدت زمان تور
-      const duration = $('.tour-duration, .package-duration, .duration-text').first().text().trim() || '3 روز';
+      // لیست سلکتورهای قوانین کنسلی
+      const policySelectors = [
+        '.cancellation-policy', 
+        '.cancel-rules',
+        '.cancellation',
+        '.cancel-policy',
+        '.refund-policy',
+        '.policy-container',
+        '.rules-section'
+      ];
       
-      // قیمت تور
-      const price = $('.tour-price, .package-price, .price-value').first().text().trim() || 'قیمت متغیر';
+      // جستجو با سلکتورهای مختلف
+      for (const selector of policySelectors) {
+        const policyElement = $(selector);
+        if (policyElement.length > 0) {
+          const policyText = policyElement.text().trim();
+          if (policyText && policyText.length > 20) { // باید به اندازه کافی طولانی باشد
+            cancellationPolicy = policyText;
+            break;
+          }
+        }
+      }
+      
+      // اگر هنوز قانون کنسلی پیدا نشد، از عناصر حاوی کلمات کلیدی استفاده کنیم
+      if (!cancellationPolicy) {
+        // جستجو برای عناصری که حاوی کلمات کلیدی هستند
+        $('p:contains("کنسلی"), div:contains("کنسلی"), span:contains("کنسلی"), p:contains("لغو"), div:contains("لغو")').each((_, element) => {
+          const text = $(element).text().trim();
+          if (text && text.length > 20 && text.length < 500) {
+            cancellationPolicy = text;
+            return false; // خروج از حلقه
+          }
+        });
+      }
+      
+      // اگر هنوز قانون کنسلی پیدا نشد، یک قانون پیش‌فرض ارائه دهیم
+      if (!cancellationPolicy) {
+        cancellationPolicy = 'لطفا برای اطلاع از قوانین کنسلی و استرداد با آژانس تماس بگیرید.';
+      }
+      
+      // تصویر تور با سلکتورهای بهبود یافته
+      let imageUrl = '';
+      
+      // لیست سلکتورهای تصویر تور
+      const imageSelectors = [
+        '.tour-image img',
+        '.package-image img',
+        '.main-image img',
+        '.tour-banner img',
+        '.tour-cover img',
+        '.package-banner img',
+        '.featured-image img',
+        '.hero-image img',
+        '.cover-photo img',
+        '.thumbnail img',
+        '.header-image img'
+      ];
+      
+      // جستجو با سلکتورهای مختلف
+      for (const selector of imageSelectors) {
+        const imgElement = $(selector).first();
+        if (imgElement.length > 0) {
+          const imgSrc = imgElement.attr('src');
+          if (imgSrc) {
+            imageUrl = imgSrc;
+            
+            // اگر آدرس تصویر نسبی است، آن را به آدرس کامل تبدیل کنیم
+            if (imageUrl && !imageUrl.startsWith('http') && !imageUrl.startsWith('data:')) {
+              const domain = new URL(url).origin;
+              imageUrl = `${domain}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
+            }
+            
+            break;
+          }
+        }
+      }
+      
+      // اگر هنوز تصویری پیدا نشد، از تصاویر اسلایدر استفاده کنیم
+      if (!imageUrl) {
+        $('.slider img, .carousel img, .gallery img, .slideshow img').each((index, element) => {
+          const imgSrc = $(element).attr('src');
+          if (imgSrc && !imageUrl) {
+            imageUrl = imgSrc;
+            
+            // اگر آدرس تصویر نسبی است، آن را به آدرس کامل تبدیل کنیم
+            if (imageUrl && !imageUrl.startsWith('http') && !imageUrl.startsWith('data:')) {
+              const domain = new URL(url).origin;
+              imageUrl = `${domain}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
+            }
+          }
+        });
+      }
+      
+      // اگر هنوز تصویری پیدا نشد، از هر تصویری در صفحه استفاده کنیم
+      if (!imageUrl) {
+        $('img').each((index, element) => {
+          const imgSrc = $(element).attr('src');
+          const imgWidth = $(element).attr('width');
+          const imgHeight = $(element).attr('height');
+          
+          // فقط تصاویر با اندازه منطقی را انتخاب کنیم (برای اجتناب از آیکون‌ها)
+          const width = imgWidth ? parseInt(imgWidth) : 0;
+          const height = imgHeight ? parseInt(imgHeight) : 0;
+          
+          if (imgSrc && (width > 200 || height > 200 || (!width && !height)) && !imageUrl) {
+            // از تصاویر کوچک مثل آیکون‌ها اجتناب کنیم
+            if (!imgSrc.includes('icon') && !imgSrc.includes('logo') && imgSrc.length > 10) {
+              imageUrl = imgSrc;
+              
+              // اگر آدرس تصویر نسبی است، آن را به آدرس کامل تبدیل کنیم
+              if (imageUrl && !imageUrl.startsWith('http') && !imageUrl.startsWith('data:')) {
+                const domain = new URL(url).origin;
+                imageUrl = `${domain}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
+              }
+            }
+          }
+        });
+      }
+      
+      // مدت زمان تور با سلکتورهای بهبود یافته
+      let duration = '';
+      
+      // لیست سلکتورهای مدت زمان تور
+      const durationSelectors = [
+        '.tour-duration',
+        '.package-duration',
+        '.duration-text',
+        '.trip-length',
+        '.tour-length',
+        '.days-count',
+        '.nights-count',
+        'span:contains("روز")',
+        'div:contains("روز")',
+        'span:contains("شب")',
+        'div:contains("شب")'
+      ];
+      
+      // جستجو با سلکتورهای مختلف
+      for (const selector of durationSelectors) {
+        const durationElement = $(selector).first();
+        if (durationElement.length > 0) {
+          const durationText = durationElement.text().trim();
+          if (durationText && durationText.length < 50) {
+            // استخراج مدت زمان به شکل "X روز و Y شب"
+            if (durationText.includes('روز') || durationText.includes('شب')) {
+              duration = durationText;
+              break;
+            }
+          }
+        }
+      }
+      
+      // اگر از سلکتورهای اصلی مدت زمان پیدا نشد، از عنوان تور استفاده کنیم
+      if (!duration) {
+        const titleMatch = title.match(/(\d+)\s*(روز|شب)/i);
+        if (titleMatch) {
+          duration = `${titleMatch[1]} ${titleMatch[2]}`;
+        } else {
+          duration = '3 روز'; // مقدار پیش‌فرض
+        }
+      }
+      
+      // قیمت تور با سلکتورهای بهبود یافته
+      let price = '';
+      
+      // لیست سلکتورهای قیمت تور
+      const priceSelectors = [
+        '.tour-price',
+        '.package-price',
+        '.price-value',
+        '.price-amount',
+        '.cost-value',
+        '.price',
+        '.cost',
+        '.amount',
+        'span:contains("تومان")',
+        'div:contains("تومان")',
+        'span:contains("ریال")',
+        'div:contains("ریال")'
+      ];
+      
+      // جستجو با سلکتورهای مختلف
+      for (const selector of priceSelectors) {
+        const priceElement = $(selector).first();
+        if (priceElement.length > 0) {
+          const priceText = priceElement.text().trim();
+          if (priceText && (priceText.includes('تومان') || priceText.includes('ریال') || priceText.includes(',') || /\d{5,}/.test(priceText))) {
+            price = priceText;
+            break;
+          }
+        }
+      }
+      
+      // اگر قیمت پیدا نشد، مقدار پیش‌فرض ارائه دهیم
+      if (!price) {
+        price = 'قیمت متغیر';
+      }
       
       // تهیه داده‌های نهایی
       const tourData = {

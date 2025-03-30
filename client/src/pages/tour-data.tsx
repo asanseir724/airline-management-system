@@ -16,9 +16,25 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 
+// تعریف تایپ‌های لازم برای ساختار داده‌ها
+interface TourHotel {
+  name: string;
+  rating: string;
+  stars: number;
+  price: string;
+  imageUrl: string;
+}
+
+// گسترش تایپ TourData برای فیلدهای services، hotels و requiredDocuments
+interface ExtendedTourData extends TourData {
+  services: string[];
+  hotels: TourHotel[];
+  requiredDocuments: string[];
+}
+
 export default function TourDataPage() {
   const { toast } = useToast();
-  const [selectedTour, setSelectedTour] = useState<TourData | null>(null);
+  const [selectedTour, setSelectedTour] = useState<ExtendedTourData | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [filter, setFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
@@ -202,7 +218,14 @@ export default function TourDataPage() {
   });
 
   const handleViewDetails = (tour: TourData) => {
-    setSelectedTour(tour);
+    // فرض کنیم که tour به عنوان ExtendedTourData است و اگر آنها undefined هستند، آرایه خالی قرار دهیم
+    const extendedTour: ExtendedTourData = {
+      ...tour,
+      services: tour.services as string[] || [],
+      hotels: tour.hotels as TourHotel[] || [],
+      requiredDocuments: tour.requiredDocuments as string[] || []
+    };
+    setSelectedTour(extendedTour);
     setIsDetailsOpen(true);
   };
 
@@ -550,12 +573,12 @@ export default function TourDataPage() {
                     </div>
                     
                     {/* خدمات تور */}
-                    {selectedTour.services && Array.isArray(selectedTour.services) && (selectedTour.services as string[]).length > 0 && (
+                    {selectedTour.services.length > 0 && (
                       <div className="mb-4">
                         <div className="font-medium mb-2">خدمات تور:</div>
                         <div className="bg-gray-50 p-3 rounded-md">
                           <ul className="list-disc list-inside space-y-1">
-                            {(selectedTour.services as string[]).map((service, index) => (
+                            {selectedTour.services.map((service, index) => (
                               <li key={index}>{service}</li>
                             ))}
                           </ul>
@@ -564,11 +587,11 @@ export default function TourDataPage() {
                     )}
 
                     {/* هتل‌های تور */}
-                    {selectedTour.hotels && Array.isArray(selectedTour.hotels) && (selectedTour.hotels as any[]).length > 0 && (
+                    {selectedTour.hotels.length > 0 && (
                       <div className="mb-4">
                         <div className="font-medium mb-2">هتل‌های تور:</div>
                         <div className="bg-gray-50 p-3 rounded-md">
-                          {(selectedTour.hotels as any[]).map((hotel, index) => (
+                          {selectedTour.hotels.map((hotel, index) => (
                             <div key={index} className="mb-3 pb-3 border-b border-gray-200 last:border-0">
                               <div className="flex justify-between items-center mb-1">
                                 <span className="font-semibold">{hotel.name}</span>
@@ -596,12 +619,12 @@ export default function TourDataPage() {
                     )}
 
                     {/* مدارک مورد نیاز */}
-                    {selectedTour.requiredDocuments && Array.isArray(selectedTour.requiredDocuments) && (selectedTour.requiredDocuments as string[]).length > 0 && (
+                    {selectedTour.requiredDocuments.length > 0 && (
                       <div className="mb-4">
                         <div className="font-medium mb-2">مدارک مورد نیاز:</div>
                         <div className="bg-gray-50 p-3 rounded-md">
                           <ul className="list-disc list-inside space-y-1">
-                            {(selectedTour.requiredDocuments as string[]).map((doc, index) => (
+                            {selectedTour.requiredDocuments.map((doc, index) => (
                               <li key={index}>{doc}</li>
                             ))}
                           </ul>
