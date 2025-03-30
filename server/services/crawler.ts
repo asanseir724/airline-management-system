@@ -219,6 +219,11 @@ export class AdvancedCrawler {
         return false;
       }
       
+      // بررسی اگر این URL یک singletour از skyrotrip است
+      if (url.includes('skyrotrip.com') && url.includes('singletour')) {
+        return await this.extractSkyroTripSingleTourData($, url);
+      }
+      
       // استخراج اطلاعات اصلی تور
       const title = this.extractTitle($);
       if (!title) {
@@ -231,8 +236,8 @@ export class AdvancedCrawler {
       const imageUrl = this.extractImageUrl($, url);
       
       // استخراج سایر اطلاعات
-      const services = this.extractServices($);
-      const hotels = this.extractHotels($);
+      const services = this.extractServices($, url);
+      const hotels = this.extractHotels($, url);
       const requiredDocuments = this.extractRequiredDocuments($);
       const cancellationPolicy = this.extractCancellationPolicy($);
       
@@ -267,6 +272,145 @@ export class AdvancedCrawler {
       return true;
     } catch (error: any) {
       console.error(`خطا در استخراج اطلاعات تور از ${url}:`, error.message);
+      return false;
+    }
+  }
+  
+  /**
+   * استخراج اطلاعات تور از یک صفحه singletour در skyrotrip
+   * @param $ آبجکت Cheerio
+   * @param url آدرس صفحه
+   * @returns آیا تور با موفقیت استخراج و ذخیره شد؟
+   */
+  private async extractSkyroTripSingleTourData($: CheerioAPI, url: string): Promise<boolean> {
+    try {
+      console.log("استخراج اطلاعات از صفحه singletour در skyrotrip:", url);
+      
+      // استخراج اطلاعات اصلی
+      const title = $('.room-details h3').text().trim() || $('.listing-title h2').text().trim();
+      if (!title) {
+        return false;
+      }
+      
+      // استخراج قیمت
+      let price = $('.listing-price-tag').text().trim();
+      if (!price.includes('تومان')) {
+        price = 'قیمت متغیر';
+      }
+      
+      // استخراج مدت
+      const durationText = $('.listing-price-tag').text().trim();
+      const durationMatch = durationText.match(/(\d+)\s*شب/);
+      const duration = durationMatch ? `${durationMatch[1]} شب` : '';
+      
+      // استخراج توضیحات
+      const description = $('.desc').text().trim() || $('.listing-title-tag').text().trim();
+      
+      // استخراج آدرس تصویر
+      let imageUrl = $('.listing-img img').attr('src') || '';
+      if (imageUrl && !imageUrl.startsWith('http')) {
+        imageUrl = 'https://skyrotrip.com' + imageUrl;
+      }
+      
+      // استخراج هتل
+      const hotelTagContent = $('.listing-price-tag').text().trim();
+      const hotelMatch = hotelTagContent.match(/هتل\s*:\s*(.+?)($|\s\d+\s*شب)/i);
+      const hotels = [{
+        name: hotelMatch && hotelMatch[1] ? hotelMatch[1].trim() : 'هتل منتخب تور',
+        stars: 4,
+        imageUrl: '',
+        rating: 'خوب',
+        price: 'قیمت متغیر'
+      }];
+      
+      // استخراج خدمات تور
+      let services: string[] = [];
+      
+      // الگوی دقیق برای استخراج خدمات اسکایرو
+      const listingAmenities = $('.listing-amenities li');
+      if (listingAmenities.length > 0) {
+        listingAmenities.each((_, el) => {
+          const service = $(el).text().trim();
+          if (service) services.push(service);
+        });
+      } else {
+        // جستجو در متن صفحه برای خدمات مشخص
+        const bodyText = $('body').text();
+        if (bodyText.includes('بلیط رفت و برگشت') || bodyText.includes('ترانسفر')) {
+          const serviceText = bodyText.match(/لیط رفت و برگشت[\s\S]+?بیمه مسافرتی/);
+          if (serviceText) {
+            const serviceLines = serviceText[0].split(/\n|،|-/);
+            services = serviceLines
+              .map(line => line.trim())
+              .filter(line => line.length > 3 && !line.includes(':'));
+          }
+        }
+      }
+      
+      // اگر هنوز خدمات پیدا نشد، از خدمات پیش‌فرض استفاده کنیم
+      if (services.length === 0) {
+        services = [
+          'بلیط رفت و برگشت',
+          'ترانسفر فرودگاهی',
+          'تور لیدر فارسی زبان',
+          'گشت شهری',
+          'بیمه مسافرتی'
+        ];
+      }
+      
+      // تشخیص داخلی یا خارجی بودن تور
+      const isForeign = this.isForeignTour(title);
+      
+      // مدارک مورد نیاز بر اساس نوع تور
+      const requiredDocuments = isForeign ? [
+        'پاسپورت با حداقل 6 ماه اعتبار',
+        'کارت ملی',
+        'عکس 6*4 رنگی با زمینه سفید'
+      ] : [
+        'کارت ملی',
+        'شناسنامه'
+      ];
+      
+      // سیاست کنسلی پیش‌فرض
+      const cancellationPolicy = `کنسلی تا ۷۲ ساعت قبل از پرواز: ۲۰ درصد جریمه
+کنسلی تا ۴۸ ساعت قبل از پرواز: ۵۰ درصد جریمه
+کنسلی کمتر از ۲۴ ساعت: ۱۰۰ درصد جریمه`;
+      
+      // ساخت آبجکت تور
+      const tourData: InsertTourData = {
+        sourceId: this.source.id,
+        title,
+        description,
+        price,
+        duration,
+        imageUrl,
+        originalUrl: url,
+        destinationId: null,
+        brandId: null,
+        isPublished: true,
+        metadata: null,
+        services,
+        hotels,
+        requiredDocuments,
+        cancellationPolicy
+      };
+      
+      console.log("اطلاعات استخراج شده از skyrotrip singletour:", {
+        title,
+        hotel: hotels[0].name,
+        services: services.length > 0 ? services : "خدمات یافت نشد"
+      });
+      
+      // ذخیره اطلاعات تور
+      await storage.createTourData(tourData);
+      
+      // افزایش شمارنده تورهای استخراج شده
+      this.toursExtracted++;
+      
+      return true;
+      
+    } catch (error: any) {
+      console.error(`خطا در استخراج اطلاعات از singletour در skyrotrip (${url}):`, error.message);
       return false;
     }
   }
@@ -563,7 +707,7 @@ export class AdvancedCrawler {
    * @param $ آبجکت Cheerio
    * @returns لیست خدمات تور
    */
-  private extractServices($: CheerioAPI): string[] {
+  private extractServices($: CheerioAPI, url: string): string[] {
     // روش‌های مختلف برای استخراج خدمات
     const methods = [
       () => $('.tour-services li').map((_, el) => $(el).text().trim()).get(),
@@ -600,9 +744,43 @@ export class AdvancedCrawler {
    * @param $ آبجکت Cheerio
    * @returns لیست هتل‌های تور
    */
-  private extractHotels($: CheerioAPI): any[] {
+  private extractHotels($: CheerioAPI, url: string): any[] {
     // روش‌های مختلف برای استخراج هتل‌ها
     let hotels: any[] = [];
+    
+    // بررسی آیا URL از skyrotrip است
+    const isSkyroTrip = url.includes('skyrotrip.com');
+    
+    if (isSkyroTrip) {
+      // روش خاص برای skyrotrip.com
+      const hotelTagContent = $('.listing-price-tag').text().trim();
+      const hotelMatch = hotelTagContent.match(/هتل\s*:\s*(.+?)$/i);
+      
+      if (hotelMatch && hotelMatch[1]) {
+        return [{
+          name: hotelMatch[1].trim(),
+          stars: 4,
+          imageUrl: '',
+          rating: 'خوب',
+          price: 'قیمت متغیر'
+        }];
+      }
+      
+      // جستجو در تمام متن صفحه برای skyrotrip
+      const hotelNameRegex = /هتل\s*:?\s*([A-Za-z\s]+Hotel)/i;
+      const pageText = $('body').text();
+      const skyroHotelMatch = pageText.match(hotelNameRegex);
+      
+      if (skyroHotelMatch && skyroHotelMatch[1]) {
+        return [{
+          name: skyroHotelMatch[1].trim(),
+          stars: 4,
+          imageUrl: '',
+          rating: 'خوب',
+          price: 'قیمت متغیر'
+        }];
+      }
+    }
     
     // روش 1: استفاده از ساختار مشخص هتل
     $('.hotel-item').each((_, el) => {
