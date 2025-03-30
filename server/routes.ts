@@ -1950,25 +1950,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // گرفتن اطلاعات metadata برای استخراج خدمات، هتل‌ها و غیره
       // اولویت: استفاده از خود فیلد در صورت موجود بودن، در غیر این صورت تلاش برای بررسی وجود در metadata
-      const services = tourData.services || 
-                      (tourData.metadata && typeof tourData.metadata === 'object' && 'services' in tourData.metadata
-                        ? tourData.metadata.services
-                        : []);
+      let services = tourData.services || [];
+      let hotels = tourData.hotels || [];
+      let requiredDocuments = tourData.requiredDocuments || [];
       
-      const hotels = tourData.hotels || 
-                    (tourData.metadata && typeof tourData.metadata === 'object' && 'hotels' in tourData.metadata
-                      ? tourData.metadata.hotels
-                      : []);
-                      
-      const requiredDocuments = tourData.requiredDocuments || 
-                              (tourData.metadata && typeof tourData.metadata === 'object' && 'requiredDocuments' in tourData.metadata
-                                ? tourData.metadata.requiredDocuments 
-                                : []);
+      // اگر فیلدهای اصلی خالی هستند، تلاش کنیم از metadata بخوانیم
+      if ((!services || services.length === 0) && 
+          tourData.metadata && typeof tourData.metadata === 'object') {
+        if ('services' in tourData.metadata) {
+          services = tourData.metadata.services;
+        }
+      }
+      
+      if ((!hotels || hotels.length === 0) && 
+          tourData.metadata && typeof tourData.metadata === 'object') {
+        if ('hotels' in tourData.metadata) {
+          hotels = tourData.metadata.hotels;
+        }
+      }
+      
+      if ((!requiredDocuments || requiredDocuments.length === 0) && 
+          tourData.metadata && typeof tourData.metadata === 'object') {
+        if ('requiredDocuments' in tourData.metadata) {
+          requiredDocuments = tourData.metadata.requiredDocuments;
+        }
+      }
       
       console.log("Services:", services);
       console.log("Hotels:", hotels);
       console.log("Required documents:", requiredDocuments);
       
+      // اگر همچنان هتل‌ها خالی است، یک هتل پیش‌فرض ایجاد کنیم
+      if (!hotels || hotels.length === 0) {
+        // استخراج نام هتل از عنوان اگر ممکن است
+        const hotelNameMatch = tourData.title.match(/هتل\s+(.+?)(\s|$)/i);
+        const defaultHotelName = hotelNameMatch ? hotelNameMatch[1] : "هتل اصلی تور";
+        
+        hotels = [{
+          name: defaultHotelName,
+          rating: "خوب",
+          stars: 4,
+          price: tourData.price || "قیمت متغیر",
+          imageUrl: ""
+        }];
+        
+        // بروزرسانی اطلاعات تور برای ذخیره هتل‌ها
+        await storage.updateTourData(id, { hotels });
+      }
+      
+      // ساخت دیتای گسترش یافته برای پیام تلگرام
       const extendedTourData = {
         ...tourData,
         metadata: tourData.metadata as Record<string, any> | null,
