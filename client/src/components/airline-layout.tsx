@@ -15,12 +15,6 @@ import {
   LogOut,
   User,
   Settings,
-  Map,
-  Plane,
-  Tag,
-  Link as LinkIcon,
-  Clock,
-  Globe,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -95,48 +89,7 @@ export function AirlineLayout({ children, title, subtitle }: AirlineLayoutProps)
     },
   ];
   
-  const tourSystemItems = [
-    {
-      title: "مدیریت مقصدهای گردشگری",
-      href: "/tour-destinations",
-      icon: <Map className="h-5 w-5 ml-3" />,
-    },
-    {
-      title: "مدیریت برندهای تور",
-      href: "/tour-brands",
-      icon: <Tag className="h-5 w-5 ml-3" />,
-    },
-    {
-      title: "درخواست‌های برند تور",
-      href: "/tour-brand-requests",
-      icon: <FileText className="h-5 w-5 ml-3" />,
-    },
-    {
-      title: "منابع تور",
-      href: "/tour-sources",
-      icon: <LinkIcon className="h-5 w-5 ml-3" />,
-    },
-    {
-      title: "داده‌های استخراج شده",
-      href: "/tour-data",
-      icon: <Globe className="h-5 w-5 ml-3" />,
-    },
-    {
-      title: "تنظیمات تور",
-      href: "/tour-settings",
-      icon: <Settings className="h-5 w-5 ml-3" />,
-    },
-    {
-      title: "تاریخچه تور",
-      href: "/tour-history",
-      icon: <Database className="h-5 w-5 ml-3" />,
-    },
-    {
-      title: "گزارش‌های سیستم تور",
-      href: "/tour-logs",
-      icon: <Clock className="h-5 w-5 ml-3" />,
-    },
-  ];
+  // سیستم تور به طور کامل حذف شد
   
   const navItems = [
     {
@@ -147,10 +100,7 @@ export function AirlineLayout({ children, title, subtitle }: AirlineLayoutProps)
       title: "سامانه استرداد",
       items: refundSystemItems,
     },
-    {
-      title: "سیستم تورهای گردشگری",
-      items: tourSystemItems,
-    },
+    // سیستم تور حذف شد
   ];
 
   return (
