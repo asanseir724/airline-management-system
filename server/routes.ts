@@ -31,6 +31,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Requests routes
   app.get("/api/requests", isAuthenticated, async (req, res, next) => {
     try {
+      const { search } = req.query;
+      
+      // اگر پارامتر جستجو ارسال شده بود، درخواست‌ها را فیلتر کنیم
+      if (search && typeof search === 'string') {
+        const searchQuery = search.trim().toLowerCase();
+        const allRequests = await storage.getRequests();
+        
+        // جستجو بر اساس شماره بلیط، نام مشتری یا شماره تماس
+        const filteredRequests = allRequests.filter(request => 
+          request.ticketNumber?.toLowerCase().includes(searchQuery) ||
+          request.customerName?.toLowerCase().includes(searchQuery) ||
+          request.phoneNumber?.toLowerCase().includes(searchQuery)
+        );
+        
+        return res.json(filteredRequests);
+      }
+      
+      // در غیر این صورت، تمام درخواست‌ها را برگردان
       const requests = await storage.getRequests();
       res.json(requests);
     } catch (error) {

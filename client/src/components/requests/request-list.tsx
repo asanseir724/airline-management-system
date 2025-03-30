@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -14,7 +15,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { Request } from "@shared/schema";
 import { format } from "date-fns-jalali";
-import { Check, Eye, FileDown, Filter, X } from "lucide-react";
+import { Check, Eye, FileDown, Filter, Search, X } from "lucide-react";
 import { RequestDetail } from "./request-detail";
 
 type ColumnDef = {
@@ -24,8 +25,28 @@ type ColumnDef = {
 };
 
 export function RequestList() {
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [searchBy, setSearchBy] = useState<string>("ticketNumber"); // جستجو بر اساس شماره بلیط به‌صورت پیش‌فرض
+  
   const { data: requests = [], isLoading } = useQuery<Request[]>({
-    queryKey: ["/api/requests"],
+    queryKey: ["/api/requests", searchTerm],
+    queryFn: async () => {
+      // اگر عبارت جستجو وجود داشته باشد، جستجو را با API انجام بده
+      if (searchTerm && searchTerm.trim() !== "") {
+        const response = await fetch(`/api/requests?search=${encodeURIComponent(searchTerm)}`);
+        if (!response.ok) {
+          throw new Error("خطا در جستجوی درخواست‌ها");
+        }
+        return await response.json();
+      }
+      
+      // در غیر این صورت، همه درخواست‌ها را دریافت کن
+      const response = await fetch("/api/requests");
+      if (!response.ok) {
+        throw new Error("خطا در دریافت درخواست‌ها");
+      }
+      return await response.json();
+    }
   });
   
   const [selectedRequest, setSelectedRequest] = useState<Request | null>(null);
@@ -143,7 +164,27 @@ export function RequestList() {
   return (
     <>
       <div className="flex justify-between items-center mb-6">
-        <div></div>
+        <div className="flex items-center gap-2 w-full max-w-lg">
+          <div className="relative flex-1">
+            <Input 
+              placeholder="جستجو..." 
+              value={searchTerm} 
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          </div>
+          <Select value={searchBy} onValueChange={setSearchBy}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="جستجو بر اساس" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ticketNumber">شماره بلیط</SelectItem>
+              <SelectItem value="customerName">نام مشتری</SelectItem>
+              <SelectItem value="phoneNumber">شماره تماس</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <div className="flex space-x-4 space-x-reverse">
           <Button className="flex items-center">
             <FileDown className="h-4 w-4 ml-2" />
