@@ -4,9 +4,10 @@ import { StatCard } from "@/components/dashboard/stat-card";
 import { RecentRequests } from "@/components/dashboard/recent-requests";
 import { CustomerRequestsComponent } from "@/components/dashboard/customer-requests";
 import { useQuery } from "@tanstack/react-query";
-import { Request, CustomerRequest } from "@shared/schema";
-import { AlertCircle, CheckCircle, Clock, Users } from "lucide-react";
+import { Request, CustomerRequest, TourDestination, TourBrand, TourBrandRequest } from "@shared/schema";
+import { AlertCircle, CheckCircle, Clock, Users, Map, Tag, FileText, Plane } from "lucide-react";
 import { useLocation } from "wouter";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
@@ -16,6 +17,18 @@ export default function Dashboard() {
   
   const { data: customerRequests = [], isLoading: isLoadingCustomer } = useQuery<CustomerRequest[]>({
     queryKey: ["/api/customer-requests"],
+  });
+  
+  const { data: tourDestinations = [], isLoading: isLoadingDestinations } = useQuery<TourDestination[]>({
+    queryKey: ["/api/tour-destinations"],
+  });
+  
+  const { data: tourBrands = [], isLoading: isLoadingBrands } = useQuery<TourBrand[]>({
+    queryKey: ["/api/tour-brands"],
+  });
+  
+  const { data: tourBrandRequests = [], isLoading: isLoadingBrandRequests } = useQuery<TourBrandRequest[]>({
+    queryKey: ["/api/tour-brand-requests"],
   });
 
   const pendingRequests = requests.filter(
@@ -31,6 +44,18 @@ export default function Dashboard() {
   const pendingCustomerRequests = customerRequests.filter(
     (request) => request.status === "pending"
   );
+  
+  const activeDestinations = tourDestinations.filter(
+    (destination) => destination.active
+  );
+  
+  const activeBrands = tourBrands.filter(
+    (brand) => brand.active
+  );
+  
+  const pendingBrandRequests = tourBrandRequests.filter(
+    (request) => request.status === "pending"
+  );
 
   const handleViewAll = (status?: string) => {
     if (status) {
@@ -39,6 +64,10 @@ export default function Dashboard() {
     } else {
       setLocation("/requests");
     }
+  };
+  
+  const handleTourView = (path: string) => {
+    setLocation(path);
   };
 
   return (
@@ -76,6 +105,44 @@ export default function Dashboard() {
           onClick={() => window.open("/customer-request-form", "_blank")}
         />
       </div>
+
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle>آمار سیستم تورهای گردشگری</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <StatCard
+              title="مقاصد گردشگری فعال"
+              value={isLoadingDestinations ? "..." : activeDestinations.length.toString()}
+              icon={<Map className="h-5 w-5 text-indigo-500" />}
+              color="indigo-500"
+              onClick={() => handleTourView("/tour-destinations")}
+            />
+            <StatCard
+              title="برندهای تور فعال"
+              value={isLoadingBrands ? "..." : activeBrands.length.toString()}
+              icon={<Tag className="h-5 w-5 text-purple-500" />}
+              color="purple-500"
+              onClick={() => handleTourView("/tour-brands")}
+            />
+            <StatCard
+              title="درخواست‌های برند تور"
+              value={isLoadingBrandRequests ? "..." : pendingBrandRequests.length.toString()}
+              icon={<FileText className="h-5 w-5 text-pink-500" />}
+              color="pink-500"
+              onClick={() => handleTourView("/tour-brand-requests")}
+            />
+            <StatCard
+              title="مدیریت تورها"
+              value=""
+              icon={<Plane className="h-5 w-5 text-cyan-500" />}
+              color="cyan-500"
+              onClick={() => handleTourView("/tour-management")}
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 gap-8 mb-8">
         <RecentRequests />

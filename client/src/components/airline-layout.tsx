@@ -50,12 +50,15 @@ export function AirlineLayout({ children, title, subtitle }: AirlineLayoutProps)
     });
   };
 
-  const refundSystemItems = [
+  const dashboardItem = [
     {
       title: "داشبورد",
       href: "/",
       icon: <LayoutDashboard className="h-5 w-5 ml-3" />,
     },
+  ];
+
+  const refundSystemItems = [
     {
       title: "مدیریت درخواست‌ها",
       href: "/requests",
@@ -97,6 +100,10 @@ export function AirlineLayout({ children, title, subtitle }: AirlineLayoutProps)
   ];
   
   const navItems = [
+    {
+      title: "داشبورد",
+      items: dashboardItem,
+    },
     {
       title: "سامانه استرداد",
       items: refundSystemItems,
