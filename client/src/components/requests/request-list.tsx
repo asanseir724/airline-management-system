@@ -17,6 +17,12 @@ import { format } from "date-fns-jalali";
 import { Check, Eye, FileDown, Filter, X } from "lucide-react";
 import { RequestDetail } from "./request-detail";
 
+type ColumnDef = {
+  header: string;
+  accessorKey: keyof Request | ((row: Request) => React.ReactNode);
+  cell?: (row: Request) => React.ReactNode;
+};
+
 export function RequestList() {
   const { data: requests = [], isLoading } = useQuery<Request[]>({
     queryKey: ["/api/requests"],
@@ -29,8 +35,8 @@ export function RequestList() {
   const [endDate, setEndDate] = useState<string>("");
 
   const filteredRequests = requests.filter((request) => {
-    const passesStatusFilter = !statusFilter || request.status === statusFilter;
-    const passesTypeFilter = !typeFilter || request.requestType === typeFilter;
+    const passesStatusFilter = !statusFilter || statusFilter === "all" || request.status === statusFilter;
+    const passesTypeFilter = !typeFilter || typeFilter === "all" || request.requestType === typeFilter;
     
     let passesDateFilter = true;
     if (startDate) {
@@ -75,7 +81,7 @@ export function RequestList() {
     return type === "refund" ? "استرداد بلیط" : "واریز وجه";
   };
 
-  const columns = [
+  const columns: ColumnDef[] = [
     {
       header: "شناسه",
       accessorKey: "id",
@@ -91,7 +97,7 @@ export function RequestList() {
     {
       header: "نوع درخواست",
       accessorKey: "requestType",
-      cell: (row: Request) => getRequestTypeText(row.requestType),
+      cell: (row) => getRequestTypeText(row.requestType),
     },
     {
       header: "شماره بلیط",
@@ -100,16 +106,17 @@ export function RequestList() {
     {
       header: "تاریخ",
       accessorKey: "createdAt",
-      cell: (row: Request) => format(new Date(row.createdAt), "yyyy/MM/dd"),
+      cell: (row) => format(new Date(row.createdAt), "yyyy/MM/dd"),
     },
     {
       header: "وضعیت",
       accessorKey: "status",
-      cell: (row: Request) => getStatusBadge(row.status),
+      cell: (row) => getStatusBadge(row.status),
     },
     {
       header: "عملیات",
-      accessorKey: (row: Request) => (
+      accessorKey: "id",
+      cell: (row) => (
         <div className="flex space-x-2 space-x-reverse">
           <Button 
             size="icon" 

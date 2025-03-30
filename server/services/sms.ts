@@ -32,6 +32,20 @@ export class SmsService {
       // اگر تنظیمات پیامک وجود ندارد یا غیرفعال است، ارسال پیامک انجام نمی‌شود
       if (!smsSettings || !smsSettings.enabled) {
         console.log('SMS is disabled or settings not found');
+        
+        // ثبت در لاگ سیستم
+        await storage.createSystemLog({
+          level: 'warning',
+          message: 'تلاش برای ارسال پیامک در حالی که سرویس غیرفعال است',
+          module: 'sms-service',
+          details: { 
+            phoneNumber: this.formatPhoneNumber(phoneNumber),
+            requestId: requestId || null,
+            settingsFound: !!smsSettings,
+            enabled: smsSettings?.enabled
+          }
+        });
+        
         return {
           status: false,
           message: 'سرویس پیامک غیرفعال است یا تنظیمات یافت نشد',
@@ -72,8 +86,31 @@ export class SmsService {
         status = true;
         responseMessage = 'پیامک با موفقیت ارسال شد';
         messageId = result.RetStatus?.toString();
+        
+        // ثبت موفقیت در لاگ سیستم
+        await storage.createSystemLog({
+          level: 'info',
+          message: `پیامک با موفقیت به ${formattedPhoneNumber} ارسال شد`,
+          module: 'sms-service',
+          details: { 
+            messageId: messageId,
+            requestId: requestId || null
+          }
+        });
       } else if (result && result.Message) {
         responseMessage = result.Message;
+        
+        // ثبت خطای API در لاگ سیستم
+        await storage.createSystemLog({
+          level: 'error',
+          message: `خطا از سمت سرویس پیامک: ${responseMessage}`,
+          module: 'sms-service',
+          details: { 
+            response: JSON.stringify(result),
+            phoneNumber: formattedPhoneNumber,
+            requestId: requestId || null
+          }
+        });
       }
 
       // ذخیره تاریخچه ارسال پیامک
@@ -147,13 +184,43 @@ export class SmsService {
       const template = templates.find(t => t.name === templateName);
       
       if (!template) {
-        throw new Error(`الگوی پیامک '${templateName}' یافت نشد`);
+        const errorMessage = `الگوی پیامک '${templateName}' یافت نشد`;
+        
+        // ثبت خطا در لاگ سیستم
+        await storage.createSystemLog({
+          level: 'warning',
+          message: errorMessage,
+          module: 'sms-service',
+          details: { templateName, requestId: requestId || null }
+        });
+        
+        throw new Error(errorMessage);
       }
       
       // ارسال پیامک با استفاده از الگو
       return await this.sendSms(phoneNumber, template.content, requestId);
     } catch (error) {
       console.error('Error sending SMS template:', error);
+      
+      // اگر خطا در مرحله ارسال پیامک باشد، در تابع sendSms لاگ ثبت شده است
+      // این بخش فقط خطاهایی را ثبت می‌کند که در بخش بالاتر رخ نداده باشند
+      if (!(error instanceof Error && error.message.includes("یافت نشد"))) {
+        try {
+          await storage.createSystemLog({
+            level: 'error',
+            message: `خطا در ارسال پیامک با الگو به ${phoneNumber}`,
+            module: 'sms-service',
+            details: { 
+              templateName, 
+              requestId: requestId || null,
+              error: error instanceof Error ? error.message : 'خطای ناشناخته' 
+            }
+          });
+        } catch (logError) {
+          console.error('Error creating system log:', logError);
+        }
+      }
+      
       return {
         status: false,
         message: error instanceof Error ? error.message : 'خطا در ارسال پیامک',

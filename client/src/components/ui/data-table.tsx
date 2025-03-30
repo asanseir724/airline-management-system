@@ -8,14 +8,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-interface Column<T> {
+export interface Column<T> {
   header: string;
   accessorKey: keyof T | ((row: T) => React.ReactNode);
   cell?: (row: T) => React.ReactNode;
 }
 
-interface DataTableProps<T> {
-  columns: Column<T>[];
+export interface DataTableProps<T> {
+  columns: Column<T>[] | readonly Column<T>[];
   data: T[];
   loading?: boolean;
   pagination?: React.ReactNode;

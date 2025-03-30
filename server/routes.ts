@@ -450,7 +450,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             } else if (validation.data.status === "rejected") {
               template = smsTemplates.find(t => t.name === "رد درخواست");
             } else if (validation.data.status === "pending") {
-              template = smsTemplates.find(t => t.name === "درحال برسی");
+              template = smsTemplates.find(t => t.name === "در حال بررسی");
             }
           }
           
