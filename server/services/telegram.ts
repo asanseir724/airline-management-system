@@ -13,6 +13,67 @@ interface TelegramResponse {
  */
 export class TelegramService {
   /**
+   * ارسال پیام تور به کانال تلگرام با استفاده از تنظیمات تور
+   * @param message متن پیام
+   * @param tourTitle عنوان تور
+   * @returns نتیجه ارسال پیام
+   */
+  static async sendTourMessage(
+    message: string,
+    tourTitle: string
+  ): Promise<TelegramResponse> {
+    try {
+      // دریافت تنظیمات تور
+      const tourSettings = await storage.getTourSettings();
+      
+      if (!tourSettings) {
+        return {
+          status: false,
+          message: 'تنظیمات تور یافت نشد'
+        };
+      }
+
+      // استخراج آیدی کانال و توکن ربات
+      const channelId = tourSettings.telegramChannels;
+      const botToken = tourSettings.telegramToken;
+
+      // ارسال پیام به کانال
+      const response = await this.sendMessageToChannel(message, channelId, botToken);
+
+      if (response.data && response.data.ok) {
+        // ثبت لاگ موفقیت
+        await storage.createTourLog({
+          level: "INFO",
+          message: `تور "${tourTitle}" با موفقیت به تلگرام ارسال شد`,
+          content: message.substring(0, 200) + "..."
+        });
+
+        return {
+          status: true,
+          message: 'پیام تور با موفقیت ارسال شد',
+          messageId: response.data.result?.message_id?.toString()
+        };
+      } else {
+        throw new Error(response.data?.description || 'خطا در ارسال پیام تور به تلگرام');
+      }
+    } catch (error) {
+      console.error('خطا در ارسال پیام تور به تلگرام:', error);
+      
+      // ثبت لاگ خطا
+      await storage.createTourLog({
+        level: "ERROR",
+        message: `خطا در ارسال تور "${tourTitle}" به تلگرام`,
+        content: error instanceof Error ? error.message : 'خطای ناشناخته'
+      });
+
+      return {
+        status: false,
+        message: error instanceof Error ? error.message : 'خطای ناشناخته در ارسال پیام تور به تلگرام'
+      };
+    }
+  }
+
+  /**
    * ارسال پیام به کانال تلگرام
    * @param message متن پیام
    * @param requestId شناسه درخواست (اختیاری)

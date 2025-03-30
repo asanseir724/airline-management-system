@@ -1779,11 +1779,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "اطلاعات تور یافت نشد" });
       }
       
-      // دریافت تنظیمات تلگرام
-      const telegramConfig = await storage.getTelegramConfig();
-      if (!telegramConfig || !telegramConfig.isActive) {
+      // دریافت تنظیمات تور
+      const tourSettings = await storage.getTourSettings();
+      if (!tourSettings) {
         return res.status(400).json({ 
-          message: "سرویس تلگرام غیرفعال است یا تنظیمات یافت نشد" 
+          message: "تنظیمات تور یافت نشد" 
         });
       }
       
@@ -1800,12 +1800,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // تولید پیام تلگرام با استفاده از تابع
       const telegramMessage = generateTelegramMessage(extendedTourData as any);
       
-      // ارسال پیام به تلگرام - ارسال undefined به جای tourData.id برای جلوگیری از خطای کلید خارجی
-      const result = await TelegramService.sendMessage(
+      // ارسال پیام به تلگرام با استفاده از متد مخصوص ارسال تور
+      const result = await TelegramService.sendTourMessage(
         telegramMessage,
-        undefined,
-        tourData.title,
-        'tour'
+        tourData.title
       );
       
       if (result.status) {
