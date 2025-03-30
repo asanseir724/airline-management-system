@@ -45,7 +45,7 @@ export class SmsService {
       console.log('Formatted phone number:', formattedPhoneNumber);
       console.log('Message:', message);
       
-      // ارسال درخواست به API
+      // ارسال درخواست به API با timeout 10 ثانیه
       const response = await axios.post(AMOOTSMS_API_URL, null, {
         params: {
           UserName: smsSettings.username || 'amoot',
@@ -56,6 +56,7 @@ export class SmsService {
           Line: smsSettings.defaultLine || '980000000', // خط پیش‌فرض
           BackupLine: smsSettings.backupLine || '980000000', // خط پشتیبان
         },
+        timeout: 10000, // 10 ثانیه timeout
       });
 
       console.log('AmootSMS API response:', response.data);
@@ -91,6 +92,20 @@ export class SmsService {
     } catch (error) {
       console.error('Error sending SMS:', error);
       
+      let errorMessage = 'خطا در ارسال پیامک';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('timeout')) {
+          errorMessage = 'زمان پاسخگویی سرور آموت پیامک به پایان رسید. لطفا مطمئن شوید IP سرور در سفیدلیست قرار دارد.';
+        } else if (error.message.includes('ECONNREFUSED')) {
+          errorMessage = 'ارتباط با سرور آموت پیامک برقرار نشد. لطفا اتصال اینترنت را بررسی کنید.';
+        } else if (error.message.includes('Network Error')) {
+          errorMessage = 'خطای شبکه در ارتباط با سرور آموت پیامک. لطفا بعدا تلاش کنید.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       // ذخیره خطا در تاریخچه
       await this.saveSmsHistory({
         phoneNumber: phoneNumber,
@@ -99,9 +114,21 @@ export class SmsService {
         requestId: requestId || null,
       });
       
+      // افزودن یک لاگ سیستم برای خطا
+      try {
+        await storage.createSystemLog({
+          level: 'error',
+          message: `خطا در ارسال پیامک به ${phoneNumber}: ${errorMessage}`,
+          module: 'sms-service',
+          details: { error: error instanceof Error ? error.message : 'خطای ناشناخته' }
+        });
+      } catch (logError) {
+        console.error('Error creating system log:', logError);
+      }
+      
       return {
         status: false,
-        message: error instanceof Error ? error.message : 'خطا در ارسال پیامک',
+        message: errorMessage,
       };
     }
   }

@@ -50,7 +50,14 @@ export function SmsForm() {
   const sendSmsMutation = useMutation({
     mutationFn: async (data: SmsFormData) => {
       const res = await apiRequest('POST', '/api/sms/send', data);
-      return res.json();
+      const result = await res.json();
+      
+      // اگر پاسخ موفقیت‌آمیز نیست، خطایی پرتاب کنیم تا به onError برود
+      if (!result.success) {
+        throw new Error(result.message || 'خطا در ارسال پیامک. لطفا مطمئن شوید IP سرور در سفیدلیست آموت اس ام اس قرار دارد.');
+      }
+      
+      return result;
     },
     onSuccess: () => {
       toast({
@@ -63,9 +70,10 @@ export function SmsForm() {
       queryClient.invalidateQueries({ queryKey: ['/api/sms/history'] });
     },
     onError: (error: Error) => {
+      console.error('Error in SMS mutation:', error);
       toast({
         title: 'خطا در ارسال پیامک',
-        description: error.message,
+        description: error.message || 'خطای ناشناخته. لطفا مطمئن شوید تنظیمات پیامک به درستی تنظیم شده‌اند.',
         variant: 'destructive',
       });
     },
