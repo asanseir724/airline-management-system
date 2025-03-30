@@ -440,6 +440,76 @@ export default function TourDataPage() {
                       </div>
                     </div>
                     
+                    {/* خدمات تور */}
+                    {selectedTour.services && Array.isArray(selectedTour.services) && selectedTour.services.length > 0 && (
+                      <div className="mb-4">
+                        <div className="font-medium mb-2">خدمات تور:</div>
+                        <div className="bg-gray-50 p-3 rounded-md">
+                          <ul className="list-disc list-inside space-y-1">
+                            {selectedTour.services.map((service, index) => (
+                              <li key={index}>{service}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* هتل‌های تور */}
+                    {selectedTour.hotels && Array.isArray(selectedTour.hotels) && selectedTour.hotels.length > 0 && (
+                      <div className="mb-4">
+                        <div className="font-medium mb-2">هتل‌های تور:</div>
+                        <div className="bg-gray-50 p-3 rounded-md">
+                          {selectedTour.hotels.map((hotel, index) => (
+                            <div key={index} className="mb-3 pb-3 border-b border-gray-200 last:border-0">
+                              <div className="flex justify-between items-center mb-1">
+                                <span className="font-semibold">{hotel.name}</span>
+                                <div>
+                                  <Badge variant="outline">
+                                    {Array(hotel.stars).fill('★').join('')}
+                                  </Badge>
+                                </div>
+                              </div>
+                              <div className="flex justify-between text-sm text-gray-600">
+                                <span>رتبه: {hotel.rating}</span>
+                                <span className="font-semibold text-primary">{hotel.price}</span>
+                              </div>
+                              {hotel.imageUrl && (
+                                <img 
+                                  src={hotel.imageUrl} 
+                                  alt={hotel.name}
+                                  className="mt-2 h-20 object-cover rounded-md"
+                                />
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* مدارک مورد نیاز */}
+                    {selectedTour.requiredDocuments && Array.isArray(selectedTour.requiredDocuments) && selectedTour.requiredDocuments.length > 0 && (
+                      <div className="mb-4">
+                        <div className="font-medium mb-2">مدارک مورد نیاز:</div>
+                        <div className="bg-gray-50 p-3 rounded-md">
+                          <ul className="list-disc list-inside space-y-1">
+                            {selectedTour.requiredDocuments.map((doc, index) => (
+                              <li key={index}>{doc}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* سیاست کنسلی */}
+                    {selectedTour.cancellationPolicy && (
+                      <div className="mb-4">
+                        <div className="font-medium mb-2">شرایط کنسلی:</div>
+                        <div className="bg-gray-50 p-3 rounded-md whitespace-pre-wrap text-sm">
+                          {selectedTour.cancellationPolicy}
+                        </div>
+                      </div>
+                    )}
+
                     {selectedTour.metadata && typeof selectedTour.metadata === 'object' && (
                       <div>
                         <div className="font-medium mb-2">اطلاعات فرادادهای:</div>
