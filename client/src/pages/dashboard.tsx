@@ -134,11 +134,11 @@ export default function Dashboard() {
               onClick={() => handleTourView("/tour-brand-requests")}
             />
             <StatCard
-              title="مدیریت تورها"
+              title="مدیریت مقصدهای گردشگری"
               value=""
-              icon={<Plane className="h-5 w-5 text-cyan-500" />}
+              icon={<Map className="h-5 w-5 text-cyan-500" />}
               color="cyan-500"
-              onClick={() => handleTourView("/tour-management")}
+              onClick={() => handleTourView("/tour-destinations")}
             />
           </div>
         </CardContent>

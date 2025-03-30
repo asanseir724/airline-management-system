@@ -17,6 +17,8 @@ import {
   Settings,
   Map,
   Plane,
+  Tag,
+  Clock,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -93,9 +95,34 @@ export function AirlineLayout({ children, title, subtitle }: AirlineLayoutProps)
   
   const tourSystemItems = [
     {
-      title: "مدیریت تورها",
-      href: "/tour-management",
-      icon: <Plane className="h-5 w-5 ml-3" />,
+      title: "مدیریت مقصدهای گردشگری",
+      href: "/tour-destinations",
+      icon: <Map className="h-5 w-5 ml-3" />,
+    },
+    {
+      title: "مدیریت برندهای تور",
+      href: "/tour-brands",
+      icon: <Tag className="h-5 w-5 ml-3" />,
+    },
+    {
+      title: "درخواست‌های برند تور",
+      href: "/tour-brand-requests",
+      icon: <FileText className="h-5 w-5 ml-3" />,
+    },
+    {
+      title: "تنظیمات تور",
+      href: "/tour-settings",
+      icon: <Settings className="h-5 w-5 ml-3" />,
+    },
+    {
+      title: "تاریخچه تور",
+      href: "/tour-history",
+      icon: <Database className="h-5 w-5 ml-3" />,
+    },
+    {
+      title: "گزارش‌های سیستم تور",
+      href: "/tour-logs",
+      icon: <Clock className="h-5 w-5 ml-3" />,
     },
   ];
   

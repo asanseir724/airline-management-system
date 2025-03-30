@@ -93,14 +93,18 @@ export default function TourBrandRequests() {
   };
 
   const getPersianDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('fa-IR', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(date as any);
+    try {
+      const date = new Date(dateString);
+      return new Intl.DateTimeFormat('fa-IR', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).format(date as unknown as string);
+    } catch (error) {
+      return dateString;
+    }
   };
 
   return (
