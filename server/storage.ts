@@ -16,7 +16,10 @@ import {
   tourBrandRequests, type TourBrandRequest, type InsertTourBrandRequest,
   tourSettings, type TourSetting, type InsertTourSetting,
   tourHistory, type TourHistory, type InsertTourHistory,
-  tourLogs, type TourLog, type InsertTourLog
+  tourLogs, type TourLog, type InsertTourLog,
+  // Tour scraping related imports
+  tourSources, type TourSource, type InsertTourSource,
+  tourData, type TourData, type InsertTourData
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
@@ -125,6 +128,22 @@ export interface IStorage {
   getTourLogs(): Promise<TourLog[]>;
   createTourLog(log: InsertTourLog): Promise<TourLog>;
   clearTourLogs(): Promise<boolean>;
+  
+  // Tour Source methods
+  getTourSources(): Promise<TourSource[]>;
+  getTourSourceById(id: number): Promise<TourSource | undefined>;
+  createTourSource(source: InsertTourSource): Promise<TourSource>;
+  updateTourSource(id: number, source: Partial<InsertTourSource>): Promise<TourSource | undefined>;
+  deleteTourSource(id: number): Promise<boolean>;
+  updateTourSourceLastScraped(id: number, lastScraped: Date): Promise<TourSource | undefined>;
+  
+  // Tour Data methods
+  getTourData(): Promise<TourData[]>;
+  getTourDataBySourceId(sourceId: number): Promise<TourData[]>;
+  createTourData(data: InsertTourData): Promise<TourData>;
+  updateTourData(id: number, data: Partial<InsertTourData>): Promise<TourData | undefined>;
+  deleteTourData(id: number): Promise<boolean>;
+  deleteTourDataBySourceId(sourceId: number): Promise<boolean>;
   
   // Session store
   sessionStore: any;
@@ -724,6 +743,116 @@ export class DatabaseStorage implements IStorage {
       console.error("Error clearing tour logs:", error);
       return false;
     }
+  }
+  
+  // Tour Source methods
+  async getTourSources(): Promise<TourSource[]> {
+    return await this.db.select().from(schema.tourSources).orderBy(desc(schema.tourSources.createdAt));
+  }
+  
+  async getTourSourceById(id: number): Promise<TourSource | undefined> {
+    const result = await this.db.select().from(schema.tourSources).where(eq(schema.tourSources.id, id)).limit(1);
+    return result[0];
+  }
+  
+  async createTourSource(source: InsertTourSource): Promise<TourSource> {
+    const result = await this.db.insert(schema.tourSources).values({
+      name: source.name,
+      url: source.url,
+      active: source.active !== undefined ? source.active : true,
+      scrapingSelector: source.scrapingSelector || null,
+      scrapingType: source.scrapingType || "default",
+    }).returning();
+    
+    return result[0];
+  }
+  
+  async updateTourSource(id: number, source: Partial<InsertTourSource>): Promise<TourSource | undefined> {
+    const updateData: any = { ...source, updatedAt: new Date() };
+    
+    const result = await this.db.update(schema.tourSources)
+      .set(updateData)
+      .where(eq(schema.tourSources.id, id))
+      .returning();
+    
+    return result[0];
+  }
+  
+  async deleteTourSource(id: number): Promise<boolean> {
+    // First delete all tour data related to this source
+    await this.deleteTourDataBySourceId(id);
+    
+    // Then delete the source
+    const result = await this.db.delete(schema.tourSources)
+      .where(eq(schema.tourSources.id, id));
+    
+    return !!result;
+  }
+  
+  async updateTourSourceLastScraped(id: number, lastScraped: Date): Promise<TourSource | undefined> {
+    const result = await this.db.update(schema.tourSources)
+      .set({ 
+        lastScraped,
+        updatedAt: new Date()
+      })
+      .where(eq(schema.tourSources.id, id))
+      .returning();
+    
+    return result[0];
+  }
+  
+  // Tour Data methods
+  async getTourData(): Promise<TourData[]> {
+    return await this.db.select().from(schema.tourData).orderBy(desc(schema.tourData.createdAt));
+  }
+  
+  async getTourDataBySourceId(sourceId: number): Promise<TourData[]> {
+    return await this.db.select().from(schema.tourData)
+      .where(eq(schema.tourData.sourceId, sourceId))
+      .orderBy(desc(schema.tourData.createdAt));
+  }
+  
+  async createTourData(data: InsertTourData): Promise<TourData> {
+    const result = await this.db.insert(schema.tourData).values({
+      sourceId: data.sourceId,
+      title: data.title,
+      description: data.description || null,
+      price: data.price || null,
+      duration: data.duration || null,
+      imageUrl: data.imageUrl || null,
+      originalUrl: data.originalUrl || null,
+      destinationId: data.destinationId || null,
+      brandId: data.brandId || null,
+      isPublished: data.isPublished !== undefined ? data.isPublished : false,
+      metadata: data.metadata || null,
+    }).returning();
+    
+    return result[0];
+  }
+  
+  async updateTourData(id: number, data: Partial<InsertTourData>): Promise<TourData | undefined> {
+    const updateData: any = { ...data, updatedAt: new Date() };
+    
+    const result = await this.db.update(schema.tourData)
+      .set(updateData)
+      .where(eq(schema.tourData.id, id))
+      .returning();
+    
+    return result[0];
+  }
+  
+  async deleteTourData(id: number): Promise<boolean> {
+    const result = await this.db.delete(schema.tourData)
+      .where(eq(schema.tourData.id, id));
+    
+    return !!result;
+  }
+  
+  async deleteTourDataBySourceId(sourceId: number): Promise<boolean> {
+    const result = await this.db.delete(schema.tourData)
+      .where(eq(schema.tourData.sourceId, sourceId));
+    
+    return !!result;
   }
 }
 

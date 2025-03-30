@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { TourHistory } from "@shared/schema";
 import { Loader2, RefreshCw, Search, Eye } from "lucide-react";
+import { formatPersianDate } from "@/lib/formatters";
 
 export default function TourHistoryPage() {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -49,20 +50,7 @@ export default function TourHistoryPage() {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      return new Intl.DateTimeFormat('fa-IR', { 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      }).format(date as unknown as string);
-    } catch (error) {
-      return dateString;
-    }
-  };
+  // We can now use the imported formatPersianDate function
 
   const handleViewDetails = (history: TourHistory) => {
     setSelectedHistory(history);
@@ -118,7 +106,7 @@ export default function TourHistoryPage() {
                   <TableCell>{history.destinationName}</TableCell>
                   <TableCell>{getStatusBadge(history.status)}</TableCell>
                   <TableCell dir="ltr" className="text-right">
-                    {formatDate(history.createdAt)}
+                    {formatPersianDate(history.createdAt)}
                   </TableCell>
                   <TableCell>
                     <Button 
@@ -162,7 +150,7 @@ export default function TourHistoryPage() {
               <div className="grid grid-cols-2 gap-2">
                 <div className="font-medium">تاریخ ارسال:</div>
                 <div dir="ltr" className="text-right">
-                  {formatDate(selectedHistory.createdAt)}
+                  {formatPersianDate(selectedHistory.createdAt)}
                 </div>
               </div>
               

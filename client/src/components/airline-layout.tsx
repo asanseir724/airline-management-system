@@ -18,7 +18,9 @@ import {
   Map,
   Plane,
   Tag,
+  Link as LinkIcon,
   Clock,
+  Globe,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -108,6 +110,16 @@ export function AirlineLayout({ children, title, subtitle }: AirlineLayoutProps)
       title: "درخواست‌های برند تور",
       href: "/tour-brand-requests",
       icon: <FileText className="h-5 w-5 ml-3" />,
+    },
+    {
+      title: "منابع تور",
+      href: "/tour-sources",
+      icon: <LinkIcon className="h-5 w-5 ml-3" />,
+    },
+    {
+      title: "داده‌های استخراج شده",
+      href: "/tour-data",
+      icon: <Globe className="h-5 w-5 ml-3" />,
     },
     {
       title: "تنظیمات تور",

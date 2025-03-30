@@ -19,6 +19,8 @@ import TourSettings from "@/pages/tour-settings";
 import TourHistory from "@/pages/tour-history";
 import TourLogs from "@/pages/tour-logs";
 import TourManagement from "@/pages/tour-management";
+import TourSources from "@/pages/tour-sources";
+import TourData from "@/pages/tour-data";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-auth";
 
@@ -41,6 +43,8 @@ function Router() {
       <ProtectedRoute path="/tour-settings" component={TourSettings} />
       <ProtectedRoute path="/tour-history" component={TourHistory} />
       <ProtectedRoute path="/tour-logs" component={TourLogs} />
+      <ProtectedRoute path="/tour-sources" component={TourSources} />
+      <ProtectedRoute path="/tour-data" component={TourData} />
       
       <Route path="/auth" component={AuthPage} />
       <Route path="/customer-request-form" component={CustomerRequestForm} />

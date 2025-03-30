@@ -370,3 +370,63 @@ export type InsertTourHistory = z.infer<typeof insertTourHistorySchema>;
 
 export type TourLog = typeof tourLogs.$inferSelect;
 export type InsertTourLog = z.infer<typeof insertTourLogSchema>;
+
+// Tour Sources (for scraping)
+export const tourSources = pgTable("tour_sources", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  url: text("url").notNull(),
+  active: boolean("active").default(true).notNull(),
+  lastScraped: timestamp("last_scraped"),
+  scrapingSelector: text("scraping_selector"),
+  scrapingType: text("scraping_type").default("default").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertTourSourceSchema = createInsertSchema(tourSources).pick({
+  name: true,
+  url: true,
+  active: true,
+  scrapingSelector: true,
+  scrapingType: true,
+});
+
+export type TourSource = typeof tourSources.$inferSelect;
+export type InsertTourSource = z.infer<typeof insertTourSourceSchema>;
+
+// Tour Data (scraped information)
+export const tourData = pgTable("tour_data", {
+  id: serial("id").primaryKey(),
+  sourceId: integer("source_id").references(() => tourSources.id),
+  title: text("title").notNull(),
+  description: text("description"),
+  price: text("price"),
+  duration: text("duration"),
+  imageUrl: text("image_url"),
+  originalUrl: text("original_url"),
+  destinationId: integer("destination_id").references(() => tourDestinations.id),
+  brandId: integer("brand_id").references(() => tourBrands.id),
+  isPublished: boolean("is_published").default(false).notNull(),
+  metadata: jsonb("metadata"),
+  scrapedAt: timestamp("scraped_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertTourDataSchema = createInsertSchema(tourData).pick({
+  sourceId: true,
+  title: true,
+  description: true,
+  price: true,
+  duration: true,
+  imageUrl: true,
+  originalUrl: true,
+  destinationId: true,
+  brandId: true,
+  isPublished: true,
+  metadata: true,
+});
+
+export type TourData = typeof tourData.$inferSelect;
+export type InsertTourData = z.infer<typeof insertTourDataSchema>;

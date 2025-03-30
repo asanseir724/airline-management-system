@@ -27,6 +27,7 @@ import { useToast } from "@/hooks/use-toast";
 import { TourLog } from "@shared/schema";
 import { Loader2, RefreshCw, Trash2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { formatPersianDate } from "@/lib/formatters";
 
 export default function TourLogs() {
   const { toast } = useToast();
@@ -80,21 +81,7 @@ export default function TourLogs() {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      return new Intl.DateTimeFormat('fa-IR', { 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-      }).format(date as unknown as string);
-    } catch (error) {
-      return dateString;
-    }
-  };
+  // Using the centralized formatPersianDate function now
 
   return (
     <AirlineLayout 
@@ -186,7 +173,7 @@ export default function TourLogs() {
                     </div>
                   </TableCell>
                   <TableCell dir="ltr" className="text-right whitespace-nowrap">
-                    {formatDate(log.createdAt)}
+                    {formatPersianDate(log.createdAt, true)}
                   </TableCell>
                 </TableRow>
               ))
