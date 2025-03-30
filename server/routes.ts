@@ -9,6 +9,7 @@ import { generateTelegramMessage } from "./services/telegram-message";
 import { scrapeTourSource } from "./services/scraping";
 import { SkyroScraper } from "./services/skyro-scraper";
 import { ApiScraper } from "./services/api-scraper";
+import { AdvancedCrawler } from "./services/crawler";
 import fileUpload, { UploadedFile } from "express-fileupload";
 
 // حذف تعریف interface چون با تایپ های express-fileupload تداخل دارد
@@ -1678,14 +1679,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "منبع تور یافت نشد" });
       }
       
-      // پارامتر اختیاری برای انتخاب روش اسکرپ (API یا ساده)
-      const useApi = req.body.useApi === true;
+      // پارامتر اختیاری برای انتخاب روش اسکرپ (API یا ساده یا کراولر)
+      const method = req.body.method || 'simple';
       
       let success = false;
       
-      if (useApi) {
+      if (method === 'api') {
         // استفاده از اسکرپر API به جای selenium
         success = await ApiScraper.scrapeTourSource(source);
+      } else if (method === 'crawler') {
+        // استفاده از کراولر پیشرفته
+        const options = req.body.crawlerOptions || {};
+        const crawler = new AdvancedCrawler(source, options);
+        success = await crawler.crawl();
       } else {
         // استفاده از اسکرپر ساده
         success = await scrapeTourSource(source);
@@ -1695,25 +1701,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // ثبت لاگ موفقیت
         await storage.createTourLog({
           level: "INFO",
-          message: `اسکرپ منبع "${source.name}" با استفاده از ${useApi ? 'API' : 'اسکرپر ساده'} با موفقیت انجام شد`,
+          message: `اسکرپ منبع "${source.name}" با استفاده از ${
+            method === 'api' ? 'API' : (method === 'crawler' ? 'کراولر پیشرفته' : 'اسکرپر ساده')
+          } با موفقیت انجام شد`,
           content: source.url
         });
         
         res.json({ 
           success: true, 
-          message: `اسکرپ با استفاده از ${useApi ? 'API' : 'اسکرپر ساده'} با موفقیت انجام شد` 
+          message: `اسکرپ با استفاده از ${
+            method === 'api' ? 'API' : (method === 'crawler' ? 'کراولر پیشرفته' : 'اسکرپر ساده')
+          } با موفقیت انجام شد` 
         });
       } else {
         // ثبت لاگ خطا
         await storage.createTourLog({
           level: "ERROR",
-          message: `خطا در اسکرپ منبع "${source.name}" با استفاده از ${useApi ? 'API' : 'اسکرپر ساده'}`,
+          message: `خطا در اسکرپ منبع "${source.name}" با استفاده از ${
+            method === 'api' ? 'API' : (method === 'crawler' ? 'کراولر پیشرفته' : 'اسکرپر ساده')
+          }`,
           content: source.url
         });
         
         res.status(500).json({ 
           success: false, 
-          message: `خطا در اسکرپ منبع تور با استفاده از ${useApi ? 'API' : 'اسکرپر ساده'}` 
+          message: `خطا در اسکرپ منبع تور با استفاده از ${
+            method === 'api' ? 'API' : (method === 'crawler' ? 'کراولر پیشرفته' : 'اسکرپر ساده')
+          }` 
         });
       }
     } catch (error) {

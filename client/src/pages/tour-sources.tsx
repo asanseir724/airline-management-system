@@ -138,8 +138,8 @@ export default function TourSources() {
 
   // Manual scrape mutation
   const scrapeMutation = useMutation({
-    mutationFn: async (params: { id: number, useApi: boolean }) => {
-      const res = await apiRequest("POST", `/api/tour-sources/${params.id}/scrape`, { useApi: params.useApi });
+    mutationFn: async (params: { id: number, method: 'simple' | 'api' | 'crawler' }) => {
+      const res = await apiRequest("POST", `/api/tour-sources/${params.id}/scrape`, { method: params.method });
       if (!res.ok) {
         const error = await res.text();
         throw new Error(error || "خطا در استخراج اطلاعات");
@@ -257,7 +257,7 @@ export default function TourSources() {
   // استفاده از dialog برای انتخاب نوع اسکرپ (API یا ساده)
   const [isScrapeDialogOpen, setIsScrapeDialogOpen] = useState(false);
   const [sourceToScrape, setSourceToScrape] = useState<number | null>(null);
-  const [useApiForScraping, setUseApiForScraping] = useState(true);
+  const [scrapeMethod, setScrapeMethod] = useState<'simple' | 'api' | 'crawler'>('api');
 
   const handleScrapeSource = (id: number) => {
     // باز کردن دیالوگ انتخاب نوع اسکرپ
@@ -270,7 +270,7 @@ export default function TourSources() {
     
     scrapeMutation.mutate({
       id: sourceToScrape,
-      useApi: useApiForScraping
+      method: scrapeMethod
     });
     
     setIsScrapeDialogOpen(false);
@@ -650,18 +650,52 @@ export default function TourSources() {
           </DialogHeader>
           
           <div className="grid gap-4 py-4">
-            <div className="flex items-center gap-3">
-              <Label htmlFor="use-api">استفاده از API (روش سریع)</Label>
-              <Switch 
-                id="use-api" 
-                checked={useApiForScraping} 
-                onCheckedChange={setUseApiForScraping} 
-              />
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2 space-x-reverse">
+                <input
+                  type="radio"
+                  id="scrape-method-simple"
+                  name="scrape-method"
+                  value="simple"
+                  checked={scrapeMethod === 'simple'}
+                  onChange={() => setScrapeMethod('simple')}
+                  className="ml-2"
+                />
+                <Label htmlFor="scrape-method-simple">روش ساده (Selenium)</Label>
+              </div>
+              
+              <div className="flex items-center space-x-2 space-x-reverse">
+                <input
+                  type="radio"
+                  id="scrape-method-api" 
+                  name="scrape-method"
+                  value="api"
+                  checked={scrapeMethod === 'api'}
+                  onChange={() => setScrapeMethod('api')}
+                  className="ml-2"
+                />
+                <Label htmlFor="scrape-method-api">روش API (سریع‌تر)</Label>
+              </div>
+              
+              <div className="flex items-center space-x-2 space-x-reverse">
+                <input
+                  type="radio"
+                  id="scrape-method-crawler"
+                  name="scrape-method" 
+                  value="crawler"
+                  checked={scrapeMethod === 'crawler'}
+                  onChange={() => setScrapeMethod('crawler')}
+                  className="ml-2"
+                />
+                <Label htmlFor="scrape-method-crawler">کراولر پیشرفته</Label>
+              </div>
             </div>
             
             <div className="text-sm text-muted-foreground">
-              {useApiForScraping ? 
-                "این روش از API های سایت منبع برای استخراج داده استفاده می‌کند و معمولاً سریع‌تر و بدون نیاز به مرورگر است." : 
+              {scrapeMethod === 'api' ? 
+                "این روش از API های سایت منبع برای استخراج داده استفاده می‌کند و معمولاً سریع‌تر است." : 
+                scrapeMethod === 'crawler' ? 
+                "این روش از کراولر پیشرفته برای پیمایش عمیق سایت و استخراج اطلاعات دقیق استفاده می‌کند." :
                 "این روش از اسکرپر ساده استفاده می‌کند و برای منابعی که API ندارند مناسب است."
               }
             </div>
