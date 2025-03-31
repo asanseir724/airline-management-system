@@ -1,86 +1,64 @@
 #!/bin/bash
-# setup.sh - اسکریپت نصب سیستم مدیریت آژانس هواپیمایی
 
-# پردازش پارامترهای ورودی
-while [ $# -gt 0 ]; do
-  case "$1" in
-    --db-user=*)
-      DB_USER="${1#*=}"
-      ;;
-    --db-password=*)
-      DB_PASSWORD="${1#*=}"
-      ;;
-    --db-name=*)
-      DB_NAME="${1#*=}"
-      ;;
-    --api-token=*)
-      API_TOKEN="${1#*=}"
-      ;;
-    *)
-      printf "***************************\n"
-      printf "* پارامتر نامعتبر: $1\n"
-      printf "***************************\n"
-      exit 1
-  esac
-  shift
-done
+# رنگ‌ها برای خروجی زیباتر
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # بدون رنگ
 
-# بررسی وجود پارامترهای ضروری
-if [ -z "$DB_USER" ] || [ -z "$DB_PASSWORD" ] || [ -z "$DB_NAME" ] || [ -z "$API_TOKEN" ]; then
-  printf "خطا: تمام پارامترهای ضروری را وارد کنید\n"
-  printf "مثال استفاده: ./setup.sh --db-user=postgres --db-password=postgres --db-name=airline_management --api-token=YOUR_AMOOTSMS_TOKEN\n"
-  exit 1
+echo -e "${YELLOW}شروع نصب و راه‌اندازی پروژه مدیریت آژانس هواپیمایی${NC}"
+echo "======================================================"
+
+# بررسی نصب بودن Node.js
+if ! command -v node &> /dev/null; then
+    echo -e "${YELLOW}Node.js نصب نیست. در حال نصب Node.js...${NC}"
+    
+    # نصب Node.js با استفاده از nvm یا مستقیم با توجه به سیستم عامل
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        # لینوکس
+        curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+        sudo apt-get install -y nodejs
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS
+        brew install node
+    else
+        echo "سیستم عامل شما پشتیبانی نمی‌شود. لطفاً Node.js را به صورت دستی نصب کنید."
+        exit 1
+    fi
+else
+    echo -e "${GREEN}Node.js قبلاً نصب شده است.${NC}"
 fi
 
-printf "🚀 شروع نصب سیستم مدیریت آژانس هواپیمایی...\n\n"
-
-# بررسی پیش‌نیازها
-printf "✅ بررسی پیش‌نیازها...\n"
-command -v node >/dev/null 2>&1 || { printf "❌ Node.js نصب نیست. لطفا آن را از https://nodejs.org نصب کنید.\n"; exit 1; }
-command -v npm >/dev/null 2>&1 || { printf "❌ npm نصب نیست. لطفا Node.js را مجدداً نصب کنید.\n"; exit 1; }
-command -v psql >/dev/null 2>&1 || { printf "❌ PostgreSQL نصب نیست. لطفا آن را از https://www.postgresql.org نصب کنید.\n"; exit 1; }
-command -v git >/dev/null 2>&1 || { printf "❌ Git نصب نیست. لطفا آن را از https://git-scm.com نصب کنید.\n"; exit 1; }
-
-# نصب وابستگی‌ها
-printf "📦 نصب وابستگی‌های نرم‌افزاری...\n"
+# نصب پکیج‌های مورد نیاز
+echo -e "${YELLOW}در حال نصب وابستگی‌های پروژه...${NC}"
 npm install
 
-# ایجاد فایل .env
-printf "⚙️ تنظیم متغیرهای محیطی...\n"
-cat > .env << EOL
-# تنظیمات دیتابیس
-DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@localhost:5432/${DB_NAME}
-PGUSER=${DB_USER}
-PGPASSWORD=${DB_PASSWORD}
-PGDATABASE=${DB_NAME}
-PGHOST=localhost
-PGPORT=5432
-
-# تنظیمات امنیتی
-SESSION_SECRET=$(openssl rand -hex 32)
-
-# تنظیمات سرویس پیامک (AmootSMS)
-AMOOTSMS_TOKEN=${API_TOKEN}
-EOL
-
-# ایجاد دیتابیس
-printf "🗄️ تنظیم دیتابیس PostgreSQL...\n"
-if psql -lqt | cut -d \| -f 1 | grep -qw ${DB_NAME}; then
-  printf "دیتابیس ${DB_NAME} از قبل وجود دارد.\n"
+# ایجاد فایل‌های محیطی
+echo -e "${YELLOW}در حال ایجاد فایل‌های محیطی...${NC}"
+if [ ! -f .env ]; then
+    echo "# متغیرهای محیطی
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/airline?schema=public
+SESSION_SECRET=your_session_secret_here
+AMOOTSMS_TOKEN=your_amootsms_token_here
+" > .env
+    echo -e "${GREEN}فایل .env ایجاد شد.${NC}"
 else
-  PGPASSWORD=${DB_PASSWORD} psql -U ${DB_USER} -c "CREATE DATABASE ${DB_NAME};" || { printf "❌ خطا در ایجاد دیتابیس\n"; exit 1; }
-  printf "دیتابیس ${DB_NAME} با موفقیت ایجاد شد.\n"
+    echo -e "${GREEN}فایل .env از قبل وجود دارد.${NC}"
 fi
 
-# اجرای مایگریشن‌های دیتابیس
-printf "🗃️ ایجاد جداول دیتابیس...\n"
+# اجرای مایگریشن دیتابیس
+echo -e "${YELLOW}در حال اعمال مایگریشن‌های دیتابیس...${NC}"
 npm run db:push
 
-# ساخت نسخه تولید
-printf "🏗️ ساخت نسخه تولید (Production Build)...\n"
-npm run build
+# راه‌اندازی پروژه
+echo -e "${GREEN}نصب و راه‌اندازی با موفقیت انجام شد!${NC}"
+echo -e "${YELLOW}برای اجرای پروژه، دستور زیر را وارد کنید:${NC}"
+echo -e "${GREEN}npm run dev${NC}"
 
-printf "\n✨ نصب سیستم مدیریت آژانس هواپیمایی با موفقیت انجام شد!\n"
-printf "🌐 برای استفاده از برنامه در حالت توسعه: npm run dev\n"
-printf "🚀 برای استفاده از برنامه در حالت تولید: npm start\n"
-printf "📖 برای اطلاعات بیشتر به فایل README.md مراجعه کنید.\n"
+echo "======================================================"
+echo -e "${YELLOW}راهنمای استفاده:${NC}"
+echo "1. فایل .env را با اطلاعات واقعی پیکربندی کنید"
+echo "2. برای اجرای پروژه، از دستور npm run dev استفاده کنید"
+echo "3. برای دسترسی به برنامه، به آدرس http://localhost:5000 مراجعه کنید"
+echo "4. نام کاربری و رمز عبور پیش‌فرض: skyro / 123456"
+
+# پایان اسکریپت
