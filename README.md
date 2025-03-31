@@ -16,11 +16,18 @@
 
 ### پیش‌نیازها
 
-- Node.js نسخه 20 یا بالاتر
-- PostgreSQL
+فقط نیاز به موارد زیر دارید:
+- سیستم عامل لینوکس (Ubuntu/Debian) یا macOS
 - دسترسی به اینترنت برای نصب وابستگی‌ها
+- دسترسی sudo (برای نصب خودکار وابستگی‌ها)
 
-### نصب با یک دستور
+اسکریپت نصب، تمام وابستگی‌های زیر را به صورت خودکار نصب و پیکربندی می‌کند:
+- Node.js نسخه 20
+- PostgreSQL
+- پکیج‌های npm مورد نیاز
+- دیتابیس و کاربر PostgreSQL
+
+### نصب با یک دستور (کاملاً خودکار)
 
 فقط کافیست دستور زیر را اجرا کنید:
 
@@ -28,40 +35,56 @@
 bash setup.sh
 ```
 
-این اسکریپت به صورت خودکار:
-1. بررسی و نصب Node.js (در صورت نیاز)
-2. نصب تمامی وابستگی‌های پروژه
-3. ایجاد فایل‌های محیطی مورد نیاز
-4. راه‌اندازی دیتابیس و اعمال مایگریشن‌ها
-5. راهنمای اجرای برنامه را نمایش می‌دهد
+این اسکریپت به صورت کاملاً خودکار:
+1. Node.js را بررسی و در صورت نیاز نصب می‌کند
+2. PostgreSQL را بررسی و در صورت نیاز نصب می‌کند
+3. کاربر و دیتابیس PostgreSQL را ایجاد و پیکربندی می‌کند
+4. تمامی وابستگی‌های npm را نصب می‌کند
+5. فایل‌های محیطی (.env) را با تنظیمات مناسب ایجاد می‌کند
+6. مایگریشن‌های دیتابیس را اعمال می‌کند
+7. راهنمای اجرا و اطلاعات اتصال به دیتابیس را نمایش می‌دهد
 
-### نصب دستی
+### نصب دستی (در صورت نیاز)
 
-اگر می‌خواهید به صورت دستی نصب کنید، مراحل زیر را دنبال کنید:
+اگر اسکریپت خودکار با مشکل مواجه شد یا می‌خواهید به صورت دستی نصب کنید:
 
-1. نصب وابستگی‌ها:
+1. نصب Node.js نسخه 20+
+2. نصب PostgreSQL 
+3. ایجاد کاربر و دیتابیس:
 ```bash
-npm install
+# در لینوکس
+sudo -u postgres psql -c "CREATE USER airlineadmin WITH PASSWORD 'airlinepass';"
+sudo -u postgres psql -c "CREATE DATABASE airline;"
+sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE airline TO airlineadmin;"
+
+# در macOS
+createuser -s airlineadmin
+psql -c "ALTER USER airlineadmin WITH PASSWORD 'airlinepass';" postgres
+createdb -O airlineadmin airline
 ```
 
-2. ایجاد فایل .env در مسیر اصلی پروژه با محتوای زیر:
+4. ایجاد فایل .env در مسیر اصلی پروژه:
 ```
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/airline?schema=public
+DATABASE_URL=postgresql://airlineadmin:airlinepass@localhost:5432/airline?schema=public
+PGHOST=localhost
+PGPORT=5432
+PGUSER=airlineadmin
+PGPASSWORD=airlinepass
+PGDATABASE=airline
 SESSION_SECRET=your_session_secret_here
 AMOOTSMS_TOKEN=your_amootsms_token_here
 ```
 
-3. اجرای مایگریشن‌های دیتابیس:
+5. نصب وابستگی‌ها و اعمال مایگریشن‌ها:
 ```bash
+npm install
 npm run db:push
 ```
 
-4. اجرای برنامه در محیط توسعه:
+6. اجرای برنامه:
 ```bash
 npm run dev
 ```
-
-5. مرورگر را باز کنید و به آدرس `http://localhost:5000` بروید
 
 ## راهنمای استفاده
 
