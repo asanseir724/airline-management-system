@@ -158,8 +158,9 @@ export class DatabaseStorage implements IStorage {
   constructor() {
     // Setup PostgreSQL connection
     const connectionString = process.env.DATABASE_URL!;
+    // Do not pass schema parameter as it can cause issues in some PostgreSQL versions
     const client = postgres(connectionString);
-    this.db = drizzle(client, { schema });
+    this.db = drizzle(client);
     
     // Setup session store
     const PostgresSessionStore = connectPg(session);

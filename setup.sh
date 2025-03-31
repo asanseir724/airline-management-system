@@ -112,7 +112,7 @@ npm install
 echo -e "${YELLOW}در حال ایجاد فایل‌های محیطی...${NC}"
 if [ ! -f .env ]; then
     echo "# متغیرهای محیطی
-DATABASE_URL=postgresql://airlineadmin:airlinepass@localhost:5432/airline?schema=public
+DATABASE_URL=postgresql://airlineadmin:airlinepass@localhost:5432/airline
 PGHOST=localhost
 PGPORT=5432
 PGUSER=airlineadmin

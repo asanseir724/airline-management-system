@@ -1,0 +1,70 @@
+> rest-express@1.0.0 dev
+> tsx server/index.ts
+
+Error initializing database: PostgresError: unrecognized configuration parameter "schema"
+    at ErrorResponse (file:///root/airline-management-system/node_modules/postgres/src/connection.js:788:26)
+    at handle (file:///root/airline-management-system/node_modules/postgres/src/connection.js:474:6)
+    at Socket.data (file:///root/airline-management-system/node_modules/postgres/src/connection.js:315:9)
+    at Socket.emit (node:events:524:28)
+    at addChunk (node:internal/streams/readable:561:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    at Readable.push (node:internal/streams/readable:392:5)
+    at TCP.onStreamRead (node:internal/stream_base_commons:191:23) {
+  severity_local: 'FATAL',
+  severity: 'FATAL',
+  code: '42704',
+  file: 'guc.c',
+  line: '5565',
+  routine: 'find_option'
+}
+2:40:53 PM [express] serving on port 5000
+Report scheduler started successfully
+System schedulers started successfully
+Error starting backup scheduler: PostgresError: unrecognized configuration parameter "schema"
+    at ErrorResponse (file:///root/airline-management-system/node_modules/postgres/src/connection.js:788:26)
+    at handle (file:///root/airline-management-system/node_modules/postgres/src/connection.js:474:6)
+    at Socket.data (file:///root/airline-management-system/node_modules/postgres/src/connection.js:315:9)
+    at Socket.emit (node:events:524:28)
+    at addChunk (node:internal/streams/readable:561:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    at Readable.push (node:internal/streams/readable:392:5)
+    at TCP.onStreamRead (node:internal/stream_base_commons:191:23) {
+  severity_local: 'FATAL',
+  severity: 'FATAL',
+  code: '42704',
+  file: 'guc.c',
+  line: '5565',
+  routine: 'find_option'
+}
+Error logging scheduler start: PostgresError: unrecognized configuration parameter "schema"
+    at ErrorResponse (file:///root/airline-management-system/node_modules/postgres/src/connection.js:788:26)
+    at handle (file:///root/airline-management-system/node_modules/postgres/src/connection.js:474:6)
+    at Socket.data (file:///root/airline-management-system/node_modules/postgres/src/connection.js:315:9)
+    at Socket.emit (node:events:524:28)
+    at addChunk (node:internal/streams/readable:561:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    at Readable.push (node:internal/streams/readable:392:5)
+    at TCP.onStreamRead (node:internal/stream_base_commons:191:23) {
+  severity_local: 'FATAL',
+  severity: 'FATAL',
+  code: '42704',
+  file: 'guc.c',
+  line: '5565',
+  routine: 'find_option'
+}
+Error logging backup scheduler error: PostgresError: unrecognized configuration parameter "schema"
+    at ErrorResponse (file:///root/airline-management-system/node_modules/postgres/src/connection.js:788:26)
+    at handle (file:///root/airline-management-system/node_modules/postgres/src/connection.js:474:6)
+    at Socket.data (file:///root/airline-management-system/node_modules/postgres/src/connection.js:315:9)
+    at Socket.emit (node:events:524:28)
+    at addChunk (node:internal/streams/readable:561:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    at Readable.push (node:internal/streams/readable:392:5)
+    at TCP.onStreamRead (node:internal/stream_base_commons:191:23) {
+  severity_local: 'FATAL',
+  severity: 'FATAL',
+  code: '42704',
+  file: 'guc.c',
+  line: '5565',
+  routine: 'find_option'
+}
