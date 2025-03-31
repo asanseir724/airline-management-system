@@ -11,7 +11,11 @@ build = ["npm", "run", "build"]
 run = ["npm", "run", "start"]
 
 [[ports]]
-localPort = 5000
+localPort = 2121
+externalPort = 3000
+
+[[ports]]
+localPort = 2121
 externalPort = 80
 
 [workflows]
@@ -39,4 +43,4 @@ task = "packager.installForAll"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "npm run dev"
-waitForPort = 5000
+waitForPort = 2121
